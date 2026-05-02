@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ETL Debug · ISSE</title>
+<style>
+  :root {
+    --bg:       #0b1220;
+    --surface:  #111d30;
+    --border:   #1e3050;
+    --text:     #d0dae8;
+    --muted:    #5a7090;
+    --gold:     #d4a843;
+    --gold-dim: #8a6820;
+    --red:      #c0392b;
+    --red-dim:  #3d0f0a;
+    --green:    #27ae60;
+    --green-dim:#0a2e18;
+    --mono:     'Courier New', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; min-height: 100vh; }
+
+  /* ── HEADER ─────────────────────────────────────────────────────── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  header h1 { font-size: 15px; font-weight: 700; color: var(--gold); letter-spacing: .04em; }
+  header span { font-size: 12px; color: var(--muted); }
+
+  /* ── FILTER BAR ─────────────────────────────────────────────────── */
+  .filter-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+  .filter-bar label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .filter-bar select,
+  .filter-bar input {
+    background: #0e1a2c;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 12px;
+    border-radius: 7px;
+    font-size: 13px;
+    outline: none;
+  }
+  .filter-bar select:focus,
+  .filter-bar input:focus { border-color: var(--gold-dim); }
+  .filter-bar button {
+    background: var(--gold);
+    color: #0b1220;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 7px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: opacity .15s;
+  }
+  .filter-bar button:hover { opacity: .85; }
+  .filter-bar button:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ── PROFESSOR AUTOCOMPLETE ─────────────────────────────────────── */
+  .prof-wrap { position: relative; }
+  .prof-wrap input { min-width: 280px; }
+  .prof-wrap input.has-selection {
+    border-color: var(--gold);
+    color: var(--gold);
+    padding-right: 28px;
+  }
+  .prof-clear {
+    position: absolute;
+    right: 9px; top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1;
+    display: none;
+  }
+  .prof-clear:hover { color: var(--red); }
+  .prof-suggestions {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 100%;
+    background: #0e1e34;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    z-index: 100;
+    overflow: hidden;
+    display: none;
+  }
+  .prof-suggestions.open { display: block; }
+  .sugg-item {
+    padding: 9px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    transition: background .1s;
+  }
+  .sugg-item:last-child { border-bottom: none; }
+  .sugg-item:hover, .sugg-item.focused { background: rgba(212,168,67,.08); color: var(--gold); }
+  .sugg-empty { padding: 10px 14px; font-size: 12px; color: var(--muted); font-style: italic; }
+  .sugg-loading { padding: 10px 14px; font-size: 12px; color: var(--muted); }
+
+  /* ── STEP INDICATOR ─────────────────────────────────────────────── */
+  .step-bar {
+    padding: 18px 28px 0;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .step-circle {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    color: var(--muted);
+    background: var(--surface);
+    transition: all .2s;
+    position: relative;
+    z-index: 1;
+  }
+  .step-item.active   .step-circle { border-color: var(--gold); color: var(--gold); background: #1a2a10; box-shadow: 0 0 0 3px rgba(212,168,67,.15); }
+  .step-item.done     .step-circle { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+  .step-item.has-drop .step-circle { border-color: var(--red); }
+  .step-label { font-size: 10px; color: var(--muted); max-width: 80px; text-align: center; line-height: 1.3; white-space: normal; }
+  .step-item.active .step-label { color: var(--gold); }
+  .step-connector {
+    flex: 1; min-width: 20px; height: 2px;
+    background: var(--border);
+    margin-bottom: 18px;
+  }
+  .step-connector.done { background: var(--green); }
+
+  /* ── MAIN CONTENT ───────────────────────────────────────────────── */
+  .content { padding: 22px 28px 40px; }
+
+  /* ── STEP CARD ──────────────────────────────────────────────────── */
+  .step-card { display: none; }
+  .step-card.visible { display: block; }
+
+  .step-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+  .step-num {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .step-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .step-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 16px;
+    max-width: 780px;
+  }
+
+  /* stats row */
+  .stats-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .stat-pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stat-pill span:first-child { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+  .stat-pill .val { font-weight: 700; font-size: 20px; color: var(--text); }
+  .stat-pill.removed .val { color: var(--red); }
+  .stat-pill.added .val { color: var(--gold); }
+
+  /* ── TABLE ──────────────────────────────────────────────────────── */
+  .table-wrap {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .table-label {
+    padding: 8px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .table-label.primary { background: #0e1e34; color: var(--gold); }
+  .table-label.danger  { background: var(--red-dim); color: var(--red); }
+  .table-scroll { overflow-x: auto; max-height: 380px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: #0e1e34;
+    color: var(--muted);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: .06em;
+    padding: 9px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  thead th.hl { color: var(--gold); }
+  tbody tr { border-bottom: 1px solid #131f30; transition: background .1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(212,168,67,.04); }
+  tbody td { padding: 8px 12px; color: var(--text); }
+  tbody td.hl { color: var(--gold); font-weight: 700; font-family: var(--mono); }
+  tbody td.num { font-family: var(--mono); color: #8fc0ff; }
+  tbody td.null { color: var(--muted); font-style: italic; }
+  .removed-table tbody td { color: #e07060; }
+  .empty-state {
+    padding: 30px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  /* ── NAV BUTTONS ────────────────────────────────────────────────── */
+  .nav-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 22px;
+  }
+  .nav-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 9px 22px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .nav-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .nav-btn:disabled { opacity: .3; cursor: not-allowed; }
+  .nav-btn.primary { background: var(--gold); color: #0b1220; border-color: var(--gold); }
+  .nav-btn.primary:hover { opacity: .85; }
+
+  /* ── LOADING / ERROR ────────────────────────────────────────────── */
+  #status-msg {
+    padding: 60px 28px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .spinner {
+    display: inline-block;
+    width: 22px; height: 22px;
+    border: 3px solid var(--border);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-box {
+    background: var(--red-dim);
+    border: 1px solid var(--red);
+    border-radius: 9px;
+    padding: 16px 20px;
+    color: #e07060;
+    font-size: 13px;
+    max-width: 600px;
+    margin: 40px auto;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ETL DEBUG</h1>
+  <span>Revisión paso a paso · Certificados Docentes</span>
+</header>
+
+<div class="filter-bar">
+  <label>Semestre</label>
+  <select id="ciclo-sel"><option value="">Cargando…</option></select>
+  <label>Profesor</label>
+  <div class="prof-wrap">
+    <input id="prof-input" type="text" placeholder="Escribe un apellido…" autocomplete="off" />
+    <span class="prof-clear" id="prof-clear" title="Limpiar">✕</span>
+    <div class="prof-suggestions" id="prof-suggestions"></div>
+  </div>
+  <button id="run-btn" disabled>▶ Ejecutar</button>
+</div>
+
+<div id="status-msg">Selecciona un semestre e ingresa un nombre de profesor.</div>
+<div id="debug-ui" style="display:none">
+  <div class="step-bar" id="step-bar"></div>
+  <div class="content" id="step-content"></div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let steps         = [];
+let current       = 0;
+let selectedProf  = '';   // exact professor name confirmed by the user
+let suggestTimer  = null;
+
+const elCiclo    = () => document.getElementById('ciclo-sel');
+const elInput    = () => document.getElementById('prof-input');
+const elClear    = () => document.getElementById('prof-clear');
+const elSugg     = () => document.getElementById('prof-suggestions');
+const elRun      = () => document.getElementById('run-btn');
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+(async () => {
+  try {
+    const r = await fetch('/api/ciclos');
+    const d = await r.json();
+    elCiclo().innerHTML = '<option value="">Selecciona un semestre…</option>' +
+      (d.ciclos || []).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  } catch {
+    elCiclo().innerHTML = '<option value="">Error al cargar</option>';
+  }
+})();
+
+// Ciclo change → clear professor selection
+elCiclo().addEventListener('change', () => { clearSelection(); updateRunBtn(); });
+
+// Typing → debounce → fetch suggestions
+elInput().addEventListener('input', () => {
+  clearSelection(false);       // clear confirmed selection but keep typed text
+  updateRunBtn();
+  clearTimeout(suggestTimer);
+  const q = elInput().value.trim();
+  if (q.length < 2) { closeSuggestions(); return; }
+  suggestTimer = setTimeout(() => fetchSuggestions(q), 280);
+});
+
+elInput().addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeSuggestions(); return; }
+  // Arrow navigation inside suggestion list
+  const items = elSugg().querySelectorAll('.sugg-item');
+  const focused = elSugg().querySelector('.sugg-item.focused');
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!items.length) return;
+    let idx = [...items].indexOf(focused);
+    idx = e.key === 'ArrowDown' ? Math.min(idx + 1, items.length - 1) : Math.max(idx - 1, 0);
+    items.forEach(i => i.classList.remove('focused'));
+    items[idx].classList.add('focused');
+    items[idx].scrollIntoView({ block: 'nearest' });
+    return;
+  }
+  if (e.key === 'Enter') {
+    if (focused) { selectProf(focused.dataset.name); return; }
+    if (selectedProf) runDebug();
+  }
+});
+
+// Click outside → close suggestions
+document.addEventListener('mousedown', e => {
+  if (!document.getElementById('prof-suggestions').contains(e.target) &&
+      e.target !== elInput()) closeSuggestions();
+});
+
+elClear().addEventListener('click', () => { clearSelection(); elInput().focus(); });
+elRun().addEventListener('click', runDebug);
+
+// ── Autocomplete helpers ────────────────────────────────────────────────────
+async function fetchSuggestions(q) {
+  const ciclo = elCiclo().value;
+  if (!ciclo) { closeSuggestions(); return; }
+  elSugg().innerHTML = '<div class="sugg-loading">Buscando…</div>';
+  elSugg().classList.add('open');
+  try {
+    const params = new URLSearchParams({ q, ciclo });
+    const r = await fetch(`/api/professors?${params}`);
+    const d = await r.json();
+    const names = d.professors || [];
+    if (!names.length) {
+      elSugg().innerHTML = '<div class="sugg-empty">Sin coincidencias en este semestre.</div>';
+    } else {
+      elSugg().innerHTML = names.map(n =>
+        `<div class="sugg-item" data-name="${esc(n)}">${esc(n)}</div>`
+      ).join('');
+      elSugg().querySelectorAll('.sugg-item').forEach(el =>
+        el.addEventListener('mousedown', e => { e.preventDefault(); selectProf(el.dataset.name); })
+      );
+    }
+  } catch {
+    elSugg().innerHTML = '<div class="sugg-empty">Error al buscar.</div>';
+  }
+}
+
+function selectProf(name) {
+  selectedProf = name;
+  elInput().value = name;
+  elInput().classList.add('has-selection');
+  elClear().style.display = 'block';
+  closeSuggestions();
+  updateRunBtn();
+}
+
+function clearSelection(clearText = true) {
+  selectedProf = '';
+  if (clearText) elInput().value = '';
+  elInput().classList.remove('has-selection');
+  elClear().style.display = 'none';
+  updateRunBtn();
+}
+
+function closeSuggestions() {
+  elSugg().classList.remove('open');
+  elSugg().innerHTML = '';
+}
+
+function updateRunBtn() {
+  elRun().disabled = !(elCiclo().value && selectedProf);
+}
+
+// ── Run ─────────────────────────────────────────────────────────────────────
+async function runDebug() {
+  const ciclo = elCiclo().value;
+  const prof  = selectedProf;
+  if (!ciclo || !prof) return;
+
+  showStatus('<span class="spinner"></span> Ejecutando ETL paso a paso…');
+  document.getElementById('debug-ui').style.display = 'none';
+  document.getElementById('run-btn').disabled = true;
+
+  try {
+    const params = new URLSearchParams({ ciclo, profesor: prof });
+    const r = await fetch(`/api/debug?${params}`);
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ detail: r.statusText }));
+      throw new Error(err.detail || r.statusText);
+    }
+    const data = await r.json();
+    steps   = data.steps || [];
+    current = 0;
+
+    if (!steps.length) { showStatus('Sin datos para ese profesor y semestre.'); return; }
+
+    buildStepBar(steps);
+    renderStep(current);
+    hideStatus();
+    document.getElementById('debug-ui').style.display = 'block';
+  } catch (e) {
+    showStatus(`<div class="error-box">❌ ${esc(e.message)}</div>`);
+  } finally {
+    document.getElementById('run-btn').disabled = false;
+  }
+}
+
+// ── Build step bar ──────────────────────────────────────────────────────────
+function buildStepBar(steps) {
+  const bar = document.getElementById('step-bar');
+  bar.innerHTML = '';
+  steps.forEach((s, i) => {
+    const item = document.createElement('div');
+    item.className = 'step-item' + (i === 0 ? ' active' : '') + (s.removed_count > 0 ? ' has-drop' : '');
+    item.innerHTML = `
+      <div class="step-circle">${s.step}</div>
+      <div class="step-label">${esc(s.label)}</div>`;
+    item.addEventListener('click', () => { current = i; renderStep(i); });
+    bar.appendChild(item);
+    if (i < steps.length - 1) {
+      const line = document.createElement('div');
+      line.className = 'step-connector';
+      line.id = `conn-${i}`;
+      bar.appendChild(line);
+    }
+  });
+}
+
+// ── Render step ─────────────────────────────────────────────────────────────
+function renderStep(idx) {
+  current = idx;
+  const s = steps[idx];
+
+  // Update step bar
+  document.querySelectorAll('.step-item').forEach((el, i) => {
+    el.classList.remove('active', 'done');
+    if (i < idx)  el.classList.add('done');
+    if (i === idx) el.classList.add('active');
+  });
+  document.querySelectorAll('.step-connector').forEach((el, i) => {
+    el.classList.toggle('done', i < idx);
+  });
+
+  const hl = new Set(s.highlight_cols || []);
+
+  // ── HTML ──────────────────────────────────────────────────────────────────
+  const html = `
+    <div class="step-header">
+      <span class="step-num">Paso ${s.step} / ${steps.length}</span>
+      <h2 class="step-title">${esc(s.label)}</h2>
+    </div>
+    <p class="step-desc">${esc(s.description)}</p>
+
+    <div class="stats-row">
+      <div class="stat-pill">
+        <span>Filas resultantes</span>
+        <span class="val">${s.row_count}</span>
+      </div>
+      ${s.removed_count > 0 ? `
+      <div class="stat-pill removed">
+        <span>Filas eliminadas</span>
+        <span class="val">${s.removed_count}</span>
+      </div>` : ''}
+      ${hl.size > 0 ? `
+      <div class="stat-pill added">
+        <span>Columnas clave</span>
+        <span class="val" style="font-size:13px;margin-top:2px">${[...hl].map(c => `<code style="background:#1a2a10;padding:2px 6px;border-radius:4px;font-size:11px">${esc(c)}</code>`).join(' ')}</span>
+      </div>` : ''}
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-label primary">📋 Filas en este paso</div>
+      <div class="table-scroll">
+        ${buildTable(s.columns, s.rows, hl, false)}
+      </div>
+    </div>
+
+    ${s.removed_count > 0 ? `
+    <div class="table-wrap">
+      <div class="table-label danger">🗑 Filas eliminadas en este paso (${s.removed_count})</div>
+      <div class="table-scroll">
+        ${buildTable(s.columns.length ? s.columns : (s.removed_rows[0] ? Object.keys(s.removed_rows[0]) : []), s.removed_rows, hl, true)}
+      </div>
+    </div>` : ''}
+
+    <div class="nav-buttons">
+      <button class="nav-btn" onclick="go(-1)" ${idx === 0 ? 'disabled' : ''}>← Anterior</button>
+      <button class="nav-btn primary" onclick="go(1)" ${idx === steps.length - 1 ? 'disabled' : ''}>Siguiente →</button>
+    </div>
+  `;
+
+  document.getElementById('step-content').innerHTML = html;
+  document.getElementById('step-content').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function go(dir) {
+  const next = current + dir;
+  if (next >= 0 && next < steps.length) renderStep(next);
+}
+
+// ── Table builder ────────────────────────────────────────────────────────────
+function buildTable(columns, rows, hlSet, isRemoved) {
+  if (!rows || rows.length === 0) {
+    return '<div class="empty-state">Sin filas.</div>';
+  }
+  const allCols = columns && columns.length ? columns : Object.keys(rows[0]);
+  const thead = `<thead><tr>${allCols.map(c =>
+    `<th class="${hlSet.has(c) ? 'hl' : ''}">${esc(c)}</th>`
+  ).join('')}</tr></thead>`;
+
+  const tbody = `<tbody>${rows.map(row => `<tr>${allCols.map(c => {
+    const v = row[c];
+    if (v === null || v === undefined) return `<td class="null">—</td>`;
+    const isNum = typeof v === 'number';
+    const cls = hlSet.has(c) ? 'hl' : (isNum ? 'num' : '');
+    const display = isNum ? (Number.isInteger(v) ? v : v.toFixed(2)) : esc(String(v));
+    return `<td class="${cls}">${display}</td>`;
+  }).join('')}</tr>`).join('')}</tbody>`;
+
+  const cls = isRemoved ? 'removed-table' : '';
+  return `<table class="${cls}">${thead}${tbody}</table>`;
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function showStatus(html) {
+  document.getElementById('status-msg').innerHTML = html;
+  document.getElementById('status-msg').style.display = 'block';
+}
+function hideStatus() {
+  document.getElementById('status-msg').style.display = 'none';
+}
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

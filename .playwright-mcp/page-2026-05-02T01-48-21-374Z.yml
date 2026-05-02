@@ -1,0 +1,116 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - img [ref=e9]
+        - generic [ref=e12]:
+          - heading "Facultad de Ingenieria" [level=1] [ref=e13]
+          - paragraph [ref=e14]: Certificados Docentes · 2016–2026
+      - generic [ref=e50]:
+        - generic [ref=e51]:
+          - img [ref=e53]
+          - generic [ref=e57]: 4,133
+          - generic [ref=e58]: Registros
+        - generic [ref=e59]:
+          - img [ref=e61]
+          - generic [ref=e66]: "511"
+          - generic [ref=e67]: Profesores
+        - generic [ref=e68]:
+          - img [ref=e70]
+          - generic [ref=e72]: "20"
+          - generic [ref=e73]: Periodos
+  - main [ref=e15]:
+    - generic [ref=e16]:
+      - button "Consultar" [ref=e17] [cursor=pointer]:
+        - img [ref=e18]
+        - text: Consultar
+      - button "Cargar Datos" [ref=e21] [cursor=pointer]:
+        - img [ref=e22]
+        - text: Cargar Datos
+    - generic [ref=e26]:
+      - generic [ref=e27]:
+        - heading "Consultar Certificados" [level=2] [ref=e28]
+        - paragraph [ref=e29]: Busca por nombre del profesor y/o periodo academico.
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - img
+          - textbox "Nombre del profesor (parcial)..." [ref=e32]: BRAVO
+        - button "Todos los periodos" [ref=e34] [cursor=pointer]:
+          - generic [ref=e35]:
+            - img [ref=e36]
+            - text: Todos los periodos
+          - img [ref=e38]
+        - button "Buscar" [ref=e40] [cursor=pointer]:
+          - img [ref=e78]
+          - text: Buscar
+        - button "Limpiar" [ref=e74] [cursor=pointer]:
+          - img [ref=e75]
+          - text: Limpiar
+      - generic [ref=e81]:
+        - generic [ref=e82]:
+          - paragraph [ref=e83]: 4 registro(s) encontrado(s)
+          - generic [ref=e84]:
+            - button "CSV" [ref=e85] [cursor=pointer]:
+              - img [ref=e86]
+              - text: CSV
+            - button "Excel" [ref=e89] [cursor=pointer]:
+              - img [ref=e90]
+              - img [ref=e93]
+              - text: Excel
+        - table [ref=e98]:
+          - rowgroup [ref=e99]:
+            - row "Profesor Componente Materia Periodo Horas Departamento" [ref=e100]:
+              - columnheader "Profesor" [ref=e101] [cursor=pointer]:
+                - generic [ref=e102]:
+                  - text: Profesor
+                  - img [ref=e103]
+              - columnheader "Componente" [ref=e106] [cursor=pointer]:
+                - generic [ref=e107]:
+                  - text: Componente
+                  - img [ref=e108]
+              - columnheader "Materia" [ref=e111] [cursor=pointer]:
+                - generic [ref=e112]:
+                  - text: Materia
+                  - img [ref=e113]
+              - columnheader "Periodo" [ref=e116] [cursor=pointer]:
+                - generic [ref=e117]:
+                  - text: Periodo
+                  - img [ref=e118]
+              - columnheader "Horas" [ref=e121] [cursor=pointer]:
+                - generic [ref=e122]:
+                  - text: Horas
+                  - img [ref=e123]
+              - columnheader "Departamento" [ref=e126] [cursor=pointer]:
+                - generic [ref=e127]:
+                  - text: Departamento
+                  - img [ref=e128]
+          - rowgroup [ref=e131]:
+            - row "BRAVO BUITRAGO JOHN EDISON Clase MATEM. FISICA Y ESTAD PERIODO 2026-1 288h MATEM. FISICA Y ESTAD. ING." [ref=e132]:
+              - cell "BRAVO BUITRAGO JOHN EDISON" [ref=e133]
+              - cell "Clase" [ref=e134]
+              - cell "MATEM. FISICA Y ESTAD" [ref=e135]
+              - cell "PERIODO 2026-1" [ref=e136]
+              - cell "288h" [ref=e137]
+              - cell "MATEM. FISICA Y ESTAD. ING." [ref=e138]
+            - row "BRAVO BUITRAGO JOHN EDISON Clase MATEM. FISICA Y ESTAD PERIODO 2025-2 256h MATEM. FISICA Y ESTAD. ING." [ref=e139]:
+              - cell "BRAVO BUITRAGO JOHN EDISON" [ref=e140]
+              - cell "Clase" [ref=e141]
+              - cell "MATEM. FISICA Y ESTAD" [ref=e142]
+              - cell "PERIODO 2025-2" [ref=e143]
+              - cell "256h" [ref=e144]
+              - cell "MATEM. FISICA Y ESTAD. ING." [ref=e145]
+            - row "BRAVO BUITRAGO JOHN EDISON Clase MATEM. FISICA Y ESTAD PERIODO 2025-1 224h MATEM. FISICA Y ESTAD. ING." [ref=e146]:
+              - cell "BRAVO BUITRAGO JOHN EDISON" [ref=e147]
+              - cell "Clase" [ref=e148]
+              - cell "MATEM. FISICA Y ESTAD" [ref=e149]
+              - cell "PERIODO 2025-1" [ref=e150]
+              - cell "224h" [ref=e151]
+              - cell "MATEM. FISICA Y ESTAD. ING." [ref=e152]
+            - row "BRAVO BUITRAGO JOHN EDISON Clase MATEM. FISICA Y ESTAD PERIODO 2024-2 224h MATEM. FISICA Y ESTAD. ING." [ref=e153]:
+              - cell "BRAVO BUITRAGO JOHN EDISON" [ref=e154]
+              - cell "Clase" [ref=e155]
+              - cell "MATEM. FISICA Y ESTAD" [ref=e156]
+              - cell "PERIODO 2024-2" [ref=e157]
+              - cell "224h" [ref=e158]
+              - cell "MATEM. FISICA Y ESTAD. ING." [ref=e159]
+    - paragraph [ref=e49]: Facultad de Ingenieria · Sistema de Certificacion Docente · 2016–2026

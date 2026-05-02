@@ -1,0 +1,140 @@
+- generic [ref=e3]:
+  - generic:
+    - img
+  - generic [ref=e4]:
+    - generic [ref=e8]:
+      - heading "ISSE Certificate API 0.1.0 OAS 3.1" [level=1] [ref=e9]:
+        - text: ISSE Certificate API
+        - generic [ref=e10]:
+          - generic [ref=e12]: 0.1.0
+          - generic [ref=e14]: OAS 3.1
+      - link "/openapi.json" [ref=e15] [cursor=pointer]:
+        - /url: /openapi.json
+        - generic [ref=e16]: /openapi.json
+    - generic [ref=e21]:
+      - heading "default Collapse operation" [level=3] [ref=e22] [cursor=pointer]:
+        - link "default" [ref=e23]:
+          - /url: "#/default"
+        - button "Collapse operation" [expanded] [ref=e24]:
+          - img [ref=e25]
+      - generic [ref=e28]:
+        - generic [ref=e31] [cursor=pointer]:
+          - button "GET /api/stats Stats" [ref=e32]:
+            - generic [ref=e33]: GET
+            - generic [ref=e34]:
+              - link "/api/stats" [ref=e36]:
+                - /url: "#/default/stats_api_stats_get"
+                - generic [ref=e37]:
+                  - text: /api
+                  - text: /stats
+              - generic [ref=e38]: Stats
+          - generic "Copy to clipboard"
+          - button "get /api/stats" [ref=e41]:
+            - img [ref=e42]
+        - generic [ref=e46] [cursor=pointer]:
+          - button "GET /api/ciclos Ciclos" [ref=e47]:
+            - generic [ref=e48]: GET
+            - generic [ref=e49]:
+              - link "/api/ciclos" [ref=e51]:
+                - /url: "#/default/ciclos_api_ciclos_get"
+                - generic [ref=e52]:
+                  - text: /api
+                  - text: /ciclos
+              - generic [ref=e53]: Ciclos
+          - generic "Copy to clipboard"
+          - button "get /api/ciclos" [ref=e56]:
+            - img [ref=e57]
+        - generic [ref=e61] [cursor=pointer]:
+          - button "GET /api/professors Professors" [ref=e62]:
+            - generic [ref=e63]: GET
+            - generic [ref=e64]:
+              - link "/api/professors" [ref=e66]:
+                - /url: "#/default/professors_api_professors_get"
+                - generic [ref=e67]:
+                  - text: /api
+                  - text: /professors
+              - generic [ref=e68]: Professors
+          - generic "Copy to clipboard"
+          - button "get /api/professors" [ref=e71]:
+            - img [ref=e72]
+        - generic [ref=e76] [cursor=pointer]:
+          - button "GET /api/certificates Certificates" [ref=e77]:
+            - generic [ref=e78]: GET
+            - generic [ref=e79]:
+              - link "/api/certificates" [ref=e81]:
+                - /url: "#/default/certificates_api_certificates_get"
+                - generic [ref=e82]:
+                  - text: /api
+                  - text: /certificates
+              - generic [ref=e83]: Certificates
+          - generic "Copy to clipboard"
+          - button "get /api/certificates" [ref=e86]:
+            - img [ref=e87]
+        - generic [ref=e91] [cursor=pointer]:
+          - button "POST /api/upload Upload" [ref=e92]:
+            - generic [ref=e93]: POST
+            - generic [ref=e94]:
+              - link "/api/upload" [ref=e96]:
+                - /url: "#/default/upload_api_upload_post"
+                - generic [ref=e97]:
+                  - text: /api
+                  - text: /upload
+              - generic [ref=e98]: Upload
+          - generic "Copy to clipboard"
+          - button "post /api/upload" [ref=e101]:
+            - img [ref=e102]
+        - generic [ref=e106] [cursor=pointer]:
+          - button "GET /api/export Export" [ref=e107]:
+            - generic [ref=e108]: GET
+            - generic [ref=e109]:
+              - link "/api/export" [ref=e111]:
+                - /url: "#/default/export_api_export_get"
+                - generic [ref=e112]:
+                  - text: /api
+                  - text: /export
+              - generic [ref=e113]: Export
+          - generic "Copy to clipboard"
+          - button "get /api/export" [ref=e116]:
+            - img [ref=e117]
+        - generic [ref=e120]:
+          - generic [ref=e121] [cursor=pointer]:
+            - button "GET /api/debug Debug Etl" [expanded] [ref=e122]:
+              - generic [ref=e123]: GET
+              - generic [ref=e124]:
+                - link "/api/debug" [ref=e126]:
+                  - /url: "#/default/debug_etl_api_debug_get"
+                  - generic [ref=e127]:
+                    - text: /api
+                    - text: /debug
+                - generic [ref=e128]: Debug Etl
+            - generic "Copy to clipboard"
+            - button "get /api/debug" [expanded] [ref=e131]:
+              - img [ref=e132]
+          - img [ref=e136]
+    - generic [ref=e141]:
+      - heading "Schemas" [level=4] [ref=e142] [cursor=pointer]:
+        - button "Schemas" [expanded] [ref=e143]:
+          - generic [ref=e144]: Schemas
+          - img [ref=e145]
+      - generic [ref=e147]:
+        - article [ref=e148]:
+          - generic [ref=e149]:
+            - button "Body_upload_api_upload_post" [ref=e150] [cursor=pointer]:
+              - generic [ref=e152]: Body_upload_api_upload_post
+              - img [ref=e154]
+            - button "Expand all" [ref=e156] [cursor=pointer]
+            - strong [ref=e157]: object
+        - article [ref=e158]:
+          - generic [ref=e159]:
+            - button "HTTPValidationError" [ref=e160] [cursor=pointer]:
+              - generic [ref=e162]: HTTPValidationError
+              - img [ref=e164]
+            - button "Expand all" [ref=e166] [cursor=pointer]
+            - strong [ref=e167]: object
+        - article [ref=e168]:
+          - generic [ref=e169]:
+            - button "ValidationError" [ref=e170] [cursor=pointer]:
+              - generic [ref=e172]: ValidationError
+              - img [ref=e174]
+            - button "Expand all" [ref=e176] [cursor=pointer]
+            - strong [ref=e177]: object

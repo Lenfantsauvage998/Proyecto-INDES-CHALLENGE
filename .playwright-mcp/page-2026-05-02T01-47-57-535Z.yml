@@ -1,0 +1,35 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e7]:
+      - img [ref=e9]
+      - generic [ref=e12]:
+        - heading "Facultad de Ingenieria" [level=1] [ref=e13]
+        - paragraph [ref=e14]: Certificados Docentes · 2016–2026
+  - main [ref=e15]:
+    - generic [ref=e16]:
+      - button "Consultar" [ref=e17] [cursor=pointer]:
+        - img [ref=e18]
+        - text: Consultar
+      - button "Cargar Datos" [ref=e21] [cursor=pointer]:
+        - img [ref=e22]
+        - text: Cargar Datos
+    - generic [ref=e26]:
+      - generic [ref=e27]:
+        - heading "Consultar Certificados" [level=2] [ref=e28]
+        - paragraph [ref=e29]: Busca por nombre del profesor y/o periodo academico.
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - img
+          - textbox "Nombre del profesor (parcial)..." [ref=e32]
+        - button "Todos los periodos" [ref=e34] [cursor=pointer]:
+          - generic [ref=e35]:
+            - img [ref=e36]
+            - text: Todos los periodos
+          - img [ref=e38]
+        - button "Buscar" [disabled] [ref=e40]:
+          - img [ref=e41]
+          - text: Buscar
+      - generic [ref=e44]:
+        - img [ref=e45]
+        - paragraph [ref=e48]: Ingresa un nombre o selecciona un periodo para buscar
+    - paragraph [ref=e49]: Facultad de Ingenieria · Sistema de Certificacion Docente · 2016–2026

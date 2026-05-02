@@ -1,0 +1,88 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - img [ref=e9]
+        - generic [ref=e12]:
+          - heading "Facultad de Ingenieria" [level=1] [ref=e13]
+          - paragraph [ref=e14]: Certificados Docentes · 2016–2026
+      - generic [ref=e50]:
+        - generic [ref=e51]:
+          - img [ref=e53]
+          - generic [ref=e57]: 4,133
+          - generic [ref=e58]: Registros
+        - generic [ref=e59]:
+          - img [ref=e61]
+          - generic [ref=e66]: "511"
+          - generic [ref=e67]: Profesores
+        - generic [ref=e68]:
+          - img [ref=e70]
+          - generic [ref=e72]: "20"
+          - generic [ref=e73]: Periodos
+  - main [ref=e15]:
+    - generic [ref=e16]:
+      - button "Consultar" [ref=e17] [cursor=pointer]:
+        - img [ref=e18]
+        - text: Consultar
+      - button "Cargar Datos" [ref=e21] [cursor=pointer]:
+        - img [ref=e22]
+        - text: Cargar Datos
+    - generic [ref=e26]:
+      - generic [ref=e27]:
+        - heading "Consultar Certificados" [level=2] [ref=e28]
+        - paragraph [ref=e29]: Busca por nombre del profesor y/o periodo academico.
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - img
+          - textbox "Nombre del profesor (parcial)..." [active] [ref=e32]: BRAVO
+        - button "Todos los periodos" [ref=e34] [cursor=pointer]:
+          - generic [ref=e35]:
+            - img [ref=e36]
+            - text: Todos los periodos
+          - img [ref=e38]
+        - button "Buscar" [ref=e40] [cursor=pointer]:
+          - img [ref=e74]
+          - text: Buscar
+        - button "Limpiar" [ref=e77] [cursor=pointer]:
+          - img [ref=e78]
+          - text: Limpiar
+      - generic [ref=e81]:
+        - generic [ref=e82]:
+          - paragraph [ref=e83]: 4 registro(s) · 992 sesiones totales
+          - generic [ref=e84]:
+            - button "CSV" [ref=e85] [cursor=pointer]:
+              - img [ref=e86]
+              - text: CSV
+            - button "Excel" [ref=e89] [cursor=pointer]:
+              - img [ref=e90]
+              - img [ref=e93]
+              - text: Excel
+        - table [ref=e98]:
+          - rowgroup [ref=e99]:
+            - row "Semestre Asignatura Sesiones Departamento" [ref=e100]:
+              - columnheader "Semestre" [ref=e101]
+              - columnheader "Asignatura" [ref=e102]
+              - columnheader "Sesiones" [ref=e103]
+              - columnheader "Departamento" [ref=e104]
+          - rowgroup [ref=e105]:
+            - row "PERIODO 2024-2 MATEM. FISICA Y ESTAD 224 MATEM. FISICA Y ESTAD. ING." [ref=e106]:
+              - cell "PERIODO 2024-2" [ref=e107]
+              - cell "MATEM. FISICA Y ESTAD" [ref=e108]
+              - cell "224" [ref=e109]
+              - cell "MATEM. FISICA Y ESTAD. ING." [ref=e110]
+            - row "PERIODO 2025-1 MATEM. FISICA Y ESTAD 224 MATEM. FISICA Y ESTAD. ING." [ref=e111]:
+              - cell "PERIODO 2025-1" [ref=e112]
+              - cell "MATEM. FISICA Y ESTAD" [ref=e113]
+              - cell "224" [ref=e114]
+              - cell "MATEM. FISICA Y ESTAD. ING." [ref=e115]
+            - row "PERIODO 2025-2 MATEM. FISICA Y ESTAD 256 MATEM. FISICA Y ESTAD. ING." [ref=e116]:
+              - cell "PERIODO 2025-2" [ref=e117]
+              - cell "MATEM. FISICA Y ESTAD" [ref=e118]
+              - cell "256" [ref=e119]
+              - cell "MATEM. FISICA Y ESTAD. ING." [ref=e120]
+            - row "PERIODO 2026-1 MATEM. FISICA Y ESTAD 288 MATEM. FISICA Y ESTAD. ING." [ref=e121]:
+              - cell "PERIODO 2026-1" [ref=e122]
+              - cell "MATEM. FISICA Y ESTAD" [ref=e123]
+              - cell "288" [ref=e124]
+              - cell "MATEM. FISICA Y ESTAD. ING." [ref=e125]
+    - paragraph [ref=e49]: Facultad de Ingenieria · Sistema de Certificacion Docente · 2016–2026

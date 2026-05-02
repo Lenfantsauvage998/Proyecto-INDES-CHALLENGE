@@ -1,0 +1,32 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - heading "ETL DEBUG" [level=1] [ref=e3]
+    - generic [ref=e4]: Revisión paso a paso · Certificados Docentes
+  - generic [ref=e5]:
+    - generic [ref=e6]: Semestre
+    - combobox [ref=e7]:
+      - option "Selecciona un semestre…" [selected]
+      - option "PERIODO 2016-2"
+      - option "PERIODO 2017-1"
+      - option "PERIODO 2017-2"
+      - option "PERIODO 2018-1"
+      - option "PERIODO 2018-2"
+      - option "PERIODO 2019-1"
+      - option "PERIODO 2019-2"
+      - option "PERIODO 2020-1"
+      - option "PERIODO 2020-2"
+      - option "PERIODO 2021-1"
+      - option "PERIODO 2021-2"
+      - option "PERIODO 2022-1"
+      - option "PERIODO 2022-2"
+      - option "PERIODO 2023-1"
+      - option "PERIODO 2023-2"
+      - option "PERIODO 2024-1"
+      - option "PERIODO 2024-2"
+      - option "PERIODO 2025-1"
+      - option "PERIODO 2025-2"
+      - option "PERIODO 2026-1"
+    - generic [ref=e8]: Profesor
+    - textbox "Nombre parcial del profesor…" [ref=e9]
+    - button "▶ Ejecutar" [disabled] [ref=e10]
+  - generic [ref=e11]: Selecciona un semestre e ingresa un nombre de profesor.

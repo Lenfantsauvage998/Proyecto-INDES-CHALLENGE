@@ -1,0 +1,39 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - img [ref=e9]
+        - generic [ref=e12]:
+          - heading "Facultad de Ingenieria" [level=1] [ref=e13]
+          - paragraph [ref=e14]: Certificados Docentes · 2016–2026
+      - generic [ref=e50]:
+        - generic [ref=e51]:
+          - img [ref=e53]
+          - generic [ref=e57]: 4,133
+          - generic [ref=e58]: Registros
+        - generic [ref=e59]:
+          - img [ref=e61]
+          - generic [ref=e66]: "511"
+          - generic [ref=e67]: Profesores
+        - generic [ref=e68]:
+          - img [ref=e70]
+          - generic [ref=e72]: "20"
+          - generic [ref=e73]: Periodos
+  - main [ref=e15]:
+    - generic [ref=e16]:
+      - button "Consultar" [ref=e17] [cursor=pointer]:
+        - img [ref=e18]
+        - text: Consultar
+      - button "Cargar Datos" [active] [ref=e21] [cursor=pointer]:
+        - img [ref=e22]
+        - text: Cargar Datos
+    - generic [ref=e160]:
+      - generic [ref=e161]:
+        - heading "Cargar Nuevo Semestre" [level=2] [ref=e162]
+        - paragraph [ref=e163]: Sube el Excel consolidado de un nuevo periodo. Los periodos ya existentes no se duplican.
+      - generic [ref=e164] [cursor=pointer]:
+        - img [ref=e166]
+        - paragraph [ref=e169]: Arrastra el Excel aqui
+        - paragraph [ref=e170]: o selecciona el archivo
+        - paragraph [ref=e171]: Acepta .xlsx · .xls
+    - paragraph [ref=e49]: Facultad de Ingenieria · Sistema de Certificacion Docente · 2016–2026
