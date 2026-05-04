@@ -1,0 +1,60 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - navigation [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e8]: ISSE
+        - generic [ref=e9]: Universidad de La Sabana
+      - generic [ref=e10]:
+        - button "Consultar" [ref=e11] [cursor=pointer]
+        - button "Cargar" [ref=e12] [cursor=pointer]
+        - button "Trazar" [ref=e13] [cursor=pointer]
+    - generic [ref=e14]:
+      - button "Consultar" [ref=e15] [cursor=pointer]: Consultar
+      - button "Cargar Datos" [ref=e17] [cursor=pointer]: Cargar Datos
+      - button "¿Cómo lo sacamos?" [ref=e19] [cursor=pointer]: ¿Cómo lo sacamos?
+    - generic [ref=e21]:
+      - heading "ISSE" [level=1] [ref=e22]
+      - generic [ref=e23]:
+        - paragraph [ref=e24]: Sistema de Certificación Docente
+        - paragraph [ref=e26]: Facultad de Ingeniería · 2016–2026
+    - img [ref=e29]:
+      - generic [ref=e31]: Scroll down · Scroll down ·
+    - img [ref=e36]
+  - generic [ref=e38]:
+    - banner [ref=e39]:
+      - generic [ref=e41]:
+        - img [ref=e43]
+        - generic [ref=e46]:
+          - paragraph [ref=e47]: Universidad de La Sabana
+          - heading "Sistema de Certificación Docente" [level=1] [ref=e48]
+    - main [ref=e49]:
+      - generic [ref=e50]:
+        - button "Consultar" [ref=e51] [cursor=pointer]:
+          - generic [ref=e53]:
+            - img [ref=e54]
+            - text: Consultar
+        - button "Cargar Datos" [ref=e57] [cursor=pointer]:
+          - generic [ref=e58]:
+            - img [ref=e59]
+            - text: Cargar Datos
+        - button "¿Cómo sacamos esta info?" [ref=e62] [cursor=pointer]:
+          - generic [ref=e63]:
+            - img [ref=e64]
+            - text: ¿Cómo sacamos esta info?
+      - generic [ref=e68]:
+        - generic [ref=e69]:
+          - heading "Consultar Certificados" [level=2] [ref=e70]
+          - paragraph [ref=e71]: Selecciona uno o varios semestres y filtra por nombre del profesor.
+        - generic [ref=e72]:
+          - button "Selecciona semestre(s)…" [ref=e74] [cursor=pointer]:
+            - generic [ref=e75]:
+              - img [ref=e76]
+              - generic [ref=e78]: Selecciona semestre(s)…
+            - img [ref=e79]
+          - generic [ref=e81]:
+            - img
+            - textbox "Nombre del profesor (parcial)..." [ref=e82]
+          - button "Buscar" [disabled] [ref=e84]:
+            - img [ref=e85]
+            - text: Buscar
+      - paragraph [ref=e89]: Facultad de Ingeniería · Universidad de La Sabana · Sistema de Certificación Docente · 2016–2026

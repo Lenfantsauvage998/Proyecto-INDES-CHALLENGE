@@ -12,9 +12,12 @@ Endpoints:
 """
 
 import io
+import os
+import shutil
 import sqlite3
 import sys
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pandas as pd
@@ -24,13 +27,24 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 # ── paths ────────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent.parent
-DB_PATH = BASE_DIR / "output" / "teaching.db"
+_db_env = os.environ.get("DB_PATH")
+DB_PATH = Path(_db_env) if _db_env else BASE_DIR / "output" / "teaching.db"
+SEED_DB = BASE_DIR / "seed" / "teaching.db"
 sys.path.insert(0, str(BASE_DIR))
 
 from etl import run_etl_on_file, parse_hour, EXCEL_PATH  # noqa: E402
 
+
 # ── app ───────────────────────────────────────────────────────────────────────
-app = FastAPI(title="ISSE Certificate API")
+@asynccontextmanager
+async def lifespan(app):
+    if not DB_PATH.exists() and SEED_DB.exists():
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(SEED_DB, DB_PATH)
+    yield
+
+
+app = FastAPI(title="ISSE Certificate API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,9 +57,22 @@ app.add_middleware(
 def get_conn() -> sqlite3.Connection:
     if not DB_PATH.exists():
         raise HTTPException(503, "Base de datos no encontrada. Ejecuta etl.py primero.")
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _profesor_filter(q: str) -> tuple[str, list]:
+    """Return (sql_fragment, params) that matches all tokens in q regardless of order.
+    'John Bravo' matches 'BRAVO BUITRAGO JOHN' because each word is checked independently."""
+    tokens = [t for t in q.lower().split() if t]
+    if not tokens:
+        return "", []
+    clauses = " AND ".join("LOWER(profesor) LIKE ?" for _ in tokens)
+    params = [f"%{t}%" for t in tokens]
+    return f" AND ({clauses})", params
 
 
 # ── endpoints ────────────────────────────────────────────────────────────────
@@ -68,7 +95,9 @@ def stats():
 def ciclos():
     if not DB_PATH.exists():
         return {"ciclos": []}
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.row_factory = sqlite3.Row
     try:
         rows = conn.execute(
@@ -95,8 +124,9 @@ def professors(
     sql = "SELECT DISTINCT profesor FROM certificados WHERE 1=1"
     params: list = []
     if q:
-        sql += " AND LOWER(profesor) LIKE ?"
-        params.append(f"%{q.lower().strip()}%")
+        frag, fparams = _profesor_filter(q.strip())
+        sql += frag
+        params.extend(fparams)
     if ciclo_list:
         placeholders = ','.join('?' * len(ciclo_list))
         sql += f" AND ciclo_lectivo IN ({placeholders})"
@@ -134,8 +164,9 @@ def certificates(
     )
     params: list = []
     if profesor.strip():
-        sql += " AND LOWER(profesor) LIKE ?"
-        params.append(f"%{profesor.strip().lower()}%")
+        frag, fparams = _profesor_filter(profesor.strip())
+        sql += frag
+        params.extend(fparams)
     if ciclo_list:
         placeholders = ','.join('?' * len(ciclo_list))
         sql += f" AND ciclo_lectivo IN ({placeholders})"
@@ -167,7 +198,9 @@ async def upload(file: UploadFile = File(...)):
 
     # ── reject if any ciclo already in DB ────────────────────────────────────
     if DB_PATH.exists():
-        _conn = sqlite3.connect(DB_PATH)
+        _conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+        _conn.execute("PRAGMA journal_mode=WAL")
+        _conn.execute("PRAGMA busy_timeout=5000")
         try:
             existing = {r[0] for r in _conn.execute("SELECT DISTINCT ciclo_lectivo FROM certificados").fetchall()}
         except Exception:
@@ -203,7 +236,9 @@ def delete_ciclo(ciclo_lectivo: str):
     """Delete all records for a specific ciclo_lectivo."""
     if not DB_PATH.exists():
         raise HTTPException(404, "No hay base de datos.")
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     try:
         result = conn.execute(
             "DELETE FROM certificados WHERE ciclo_lectivo = ?", (ciclo_lectivo,)
@@ -370,8 +405,9 @@ def export(
     )
     params: list = []
     if profesor.strip():
-        sql += " AND LOWER(profesor) LIKE ?"
-        params.append(f"%{profesor.strip().lower()}%")
+        frag, fparams = _profesor_filter(profesor.strip())
+        sql += frag
+        params.extend(fparams)
     if ciclo_list:
         placeholders = ','.join('?' * len(ciclo_list))
         sql += f" AND ciclo_lectivo IN ({placeholders})"
@@ -729,3 +765,17 @@ def _debug_etl_inner(profesor: str, ciclo: str):
         "inst_col": inst_col,
         "steps": steps,
     }
+
+
+# ── static files (React build) — must be LAST so /api/* routes take priority ──
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse as _FileResponse
+
+_STATIC_DIR = BASE_DIR / "frontend" / "dist"
+
+if _STATIC_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=_STATIC_DIR / "assets"), name="assets")
+
+    @app.get("/{full_path:path}")
+    def serve_spa(full_path: str):
+        return _FileResponse(_STATIC_DIR / "index.html")

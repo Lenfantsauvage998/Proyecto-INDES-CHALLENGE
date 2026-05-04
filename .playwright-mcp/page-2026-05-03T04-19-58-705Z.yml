@@ -1,0 +1,38 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e7]:
+      - img [ref=e9]
+      - generic [ref=e12]:
+        - paragraph [ref=e13]: Universidad de La Sabana
+        - heading "Sistema de Certificación Docente" [level=1] [ref=e14]
+  - main [ref=e16]:
+    - generic [ref=e17]:
+      - button "Consultar" [ref=e18] [cursor=pointer]:
+        - img [ref=e19]
+        - text: Consultar
+      - button "Cargar Datos" [ref=e22] [cursor=pointer]:
+        - img [ref=e23]
+        - text: Cargar Datos
+      - button "¿Cómo sacamos esta info?" [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+        - text: ¿Cómo sacamos esta info?
+    - generic [ref=e31]:
+      - generic [ref=e32]:
+        - heading "Consultar Certificados" [level=2] [ref=e33]
+        - paragraph [ref=e34]: Selecciona uno o varios semestres y filtra por nombre del profesor.
+      - generic [ref=e35]:
+        - button "Selecciona semestre(s)…" [ref=e37] [cursor=pointer]:
+          - generic [ref=e38]:
+            - img [ref=e39]
+            - generic [ref=e41]: Selecciona semestre(s)…
+          - img [ref=e42]
+        - generic [ref=e44]:
+          - img
+          - textbox "Nombre del profesor (parcial)..." [ref=e45]
+        - button "Buscar" [disabled] [ref=e46]:
+          - img [ref=e47]
+          - text: Buscar
+      - generic [ref=e50]:
+        - img [ref=e51]
+        - paragraph [ref=e54]: Selecciona un semestre e ingresa un nombre para buscar
+    - paragraph [ref=e55]: Facultad de Ingeniería · Universidad de La Sabana · Sistema de Certificación Docente · 2016–2026

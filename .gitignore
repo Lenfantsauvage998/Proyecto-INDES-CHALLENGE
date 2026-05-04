@@ -63,6 +63,11 @@ logs/
 .cache/
 *.bak
 
+# Claude Code
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
+
+frontend/nul

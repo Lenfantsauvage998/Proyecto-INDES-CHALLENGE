@@ -4,47 +4,129 @@
 
 @layer base {
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
 
   body {
     margin: 0;
-    background-color: #070e1c;
-    color: #f1f5f9;
-    font-family: 'Inter', system-ui, sans-serif;
+    background-color: #0c0c0c;
+    color: #ffffff;
+    font-family: 'Cabinet-Grotesk', 'Inter', Arial, 'Helvetica Neue', Helvetica, sans-serif;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
   }
 
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: #0a1628; }
-  ::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: #d4a843; }
+  ::selection {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+  }
+
+  /* Custom Scrollbar — minimal dark */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
 }
 
 @layer components {
+  /* Glass morphism utility */
+  .glass {
+    background: rgba(20, 20, 20, 0.65);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
   .card {
-    @apply bg-navy-800 border border-navy-600 rounded-xl;
+    @apply rounded-2xl;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.2), 0 8px 32px rgba(0,0,0,0.35);
   }
 
-  .gold-border {
-    border-color: rgba(212, 168, 67, 0.3);
+  .input {
+    @apply rounded-lg px-3 py-2 text-sm outline-none transition-all duration-200;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    caret-color: #ffffff;
+  }
+  .input::placeholder { color: #737373; }
+  .input:focus {
+    border-color: rgba(255, 255, 255, 0.40);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.09);
+  }
+  .input::placeholder { color: #737373; }
+  .input:focus {
+    border-color: rgba(255, 255, 255, 0.40);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.09);
   }
 
-  .input-dark {
-    @apply bg-navy-700 border border-navy-500 text-slate-100 placeholder-slate-500
-           rounded-lg px-3 py-2 text-sm outline-none transition-all duration-200
-           focus:border-gold-500 focus:ring-1 focus:ring-gold-500/30;
+  .btn-primary {
+    @apply font-medium px-4 py-2 rounded-lg text-sm transition-all duration-200 active:scale-[0.97];
+    background-color: #ffffff;
+    color: #000000;
   }
-
-  .btn-gold {
-    @apply bg-gold-500 hover:bg-gold-400 text-navy-900 font-semibold
-           px-4 py-2 rounded-lg text-sm transition-all duration-200
-           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  .btn-primary:hover:not(:disabled) {
+    background-color: #e4e4e4;
+  }
+  .btn-primary:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
   }
 
   .btn-outline {
-    @apply border border-navy-500 hover:border-gold-500 text-slate-300 hover:text-gold-400
-           px-4 py-2 rounded-lg text-sm transition-all duration-200 active:scale-95;
+    @apply px-4 py-2 rounded-lg text-sm transition-all duration-200 active:scale-[0.97];
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #d4d4d8;
+  }
+  .btn-outline:hover {
+    border-color: rgba(255, 255, 255, 0.40);
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
   }
 
-  .table-row-even { background-color: rgba(10, 22, 40, 0.6); }
-  .table-row-odd  { background-color: rgba(15, 31, 61, 0.4); }
+  .table-row-even { background-color: transparent; }
+  .table-row-odd  { background-color: rgba(255,255,255,0.015); }
+
+  /* Dual range slider — pointer-events only on thumb so both handles are always reachable */
+  .range-thumb {
+    pointer-events: none;
+  }
+  .range-thumb::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    pointer-events: all;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid rgba(0,0,0,0.4);
+    cursor: grab;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.15);
+    transition: box-shadow 0.15s, transform 0.1s;
+  }
+  .range-thumb::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 0 5px rgba(255,255,255,0.22);
+    transform: scale(1.1);
+  }
+  .range-thumb::-webkit-slider-thumb:active {
+    cursor: grabbing;
+    transform: scale(1.15);
+  }
+  .range-thumb::-moz-range-thumb {
+    pointer-events: all;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid rgba(0,0,0,0.4);
+    cursor: grab;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.15);
+  }
+  .range-thumb::-webkit-slider-runnable-track { background: transparent; }
+  .range-thumb::-moz-range-track { background: transparent; }
 }

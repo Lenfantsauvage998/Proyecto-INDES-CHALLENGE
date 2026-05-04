@@ -1,0 +1,24 @@
+# Exclude heavy/unnecessary files from Docker build context
+frontend/node_modules/
+**/__pycache__/
+*.py[cod]
+.git/
+.gitignore
+.claude/
+*.log
+*.tmp
+*.bak
+.venv/
+venv/
+ENV/
+
+# Exclude raw Excel source files (too large, not needed at runtime)
+PREGRADO_CONSOLIDADO_2016_2_2026_1.xlsx
+PARTE1_2016_2_a_2025_2.xlsx
+PARTE2_2026_1.xlsx
+certificado_2024-1.xlsx
+EDA.IPYNB
+PRESENTACION.pptx
+PROPUESTA_PARA RETO_FACULTAD.docx
+
+# Keep: output/teaching.db (seed), frontend/dist/ (built app)

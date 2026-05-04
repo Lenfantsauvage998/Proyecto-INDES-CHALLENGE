@@ -11,6 +11,7 @@ Business rules:
   6.  weekly_hours * 16 → semester hours
 """
 
+import os
 import re
 import sqlite3
 import sys
@@ -20,7 +21,8 @@ import pandas as pd
 
 BASE_DIR = Path(__file__).parent
 EXCEL_PATH = BASE_DIR / "PREGRADO_CONSOLIDADO_2016_2_2026_1.xlsx"
-DB_PATH = BASE_DIR / "output" / "teaching.db"
+_db_env = os.environ.get("DB_PATH")
+DB_PATH = Path(_db_env) if _db_env else BASE_DIR / "output" / "teaching.db"
 
 
 SEMESTER_DATES = {
