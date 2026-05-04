@@ -34,10 +34,10 @@ export default function App() {
     document.getElementById('app')?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'query',  label: 'Consultar',                icon: <Search      className="w-4 h-4" /> },
-    { id: 'upload', label: 'Cargar Datos',             icon: <UploadCloud className="w-4 h-4" /> },
-    { id: 'debug',  label: '¿Cómo sacamos esta info?', icon: <HelpCircle  className="w-4 h-4" /> },
+  const tabs: { id: Tab; label: string; shortLabel: string; icon: React.ReactNode }[] = [
+    { id: 'query',  label: 'Consultar',                shortLabel: 'Consultar', icon: <Search      className="w-4 h-4" /> },
+    { id: 'upload', label: 'Cargar Datos',             shortLabel: 'Cargar',    icon: <UploadCloud className="w-4 h-4" /> },
+    { id: 'debug',  label: '¿Cómo sacamos esta info?', shortLabel: '¿Cómo?',  icon: <HelpCircle  className="w-4 h-4" /> },
   ]
 
   return (
@@ -62,13 +62,13 @@ export default function App() {
 
         <main className="max-w-7xl w-full mx-auto px-5 sm:px-8 py-10">
           {/* Premium Tab Bar */}
-          <div className="flex items-center gap-1 p-1 w-fit mb-8 rounded-2xl glass">
+          <div className="flex items-center gap-1 p-1 w-full sm:w-fit mb-8 rounded-2xl glass">
             {tabs.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  'relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300',
+                  'relative flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-300',
                   tab === t.id
                     ? 'text-black'
                     : 'text-zinc-300 hover:text-white hover:bg-white/[0.06]'
@@ -81,9 +81,10 @@ export default function App() {
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                   />
                 )}
-                <span className="relative z-10 flex items-center gap-2">
+                <span className="relative z-10 flex items-center gap-1.5 sm:gap-2">
                   {t.icon}
-                  {t.label}
+                  <span className="sm:hidden">{t.shortLabel}</span>
+                  <span className="hidden sm:inline">{t.label}</span>
                 </span>
               </button>
             ))}

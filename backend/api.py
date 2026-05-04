@@ -13,38 +13,28 @@ Endpoints:
 
 import io
 import os
-import shutil
-import sqlite3
 import sys
 import tempfile
-from contextlib import asynccontextmanager
+import threading
+import uuid
 from pathlib import Path
 
 import pandas as pd
+import psycopg2
+import psycopg2.extras
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
-# ── paths ────────────────────────────────────────────────────────────────────
+# ── config ────────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent.parent
-_db_env = os.environ.get("DB_PATH")
-DB_PATH = Path(_db_env) if _db_env else BASE_DIR / "output" / "teaching.db"
-SEED_DB = BASE_DIR / "seed" / "teaching.db"
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 sys.path.insert(0, str(BASE_DIR))
 
-from etl import run_etl_on_file, parse_hour, EXCEL_PATH  # noqa: E402
-
+from etl import run_etl_on_file, parse_hour  # noqa: E402
 
 # ── app ───────────────────────────────────────────────────────────────────────
-@asynccontextmanager
-async def lifespan(app):
-    if not DB_PATH.exists() and SEED_DB.exists():
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(SEED_DB, DB_PATH)
-    yield
-
-
-app = FastAPI(title="ISSE Certificate API", lifespan=lifespan)
+app = FastAPI(title="ISSE Certificate API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -53,24 +43,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── background upload job tracker ────────────────────────────────────────────
+_upload_jobs: dict[str, dict] = {}
 
-def get_conn() -> sqlite3.Connection:
-    if not DB_PATH.exists():
-        raise HTTPException(503, "Base de datos no encontrada. Ejecuta etl.py primero.")
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=5000")
-    conn.row_factory = sqlite3.Row
+
+def get_conn():
+    if not DATABASE_URL:
+        raise HTTPException(503, "DATABASE_URL no configurada.")
+    conn = psycopg2.connect(DATABASE_URL)
     return conn
 
 
+def _fetchall(conn, sql: str, params=None) -> list:
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(sql, params or [])
+    return cur.fetchall()
+
+
+def _fetchone_tuple(conn, sql: str, params=None):
+    cur = conn.cursor()
+    cur.execute(sql, params or [])
+    return cur.fetchone()
+
+
 def _profesor_filter(q: str) -> tuple[str, list]:
-    """Return (sql_fragment, params) that matches all tokens in q regardless of order.
-    'John Bravo' matches 'BRAVO BUITRAGO JOHN' because each word is checked independently."""
+    """Return (sql_fragment, params) matching all tokens regardless of order."""
     tokens = [t for t in q.lower().split() if t]
     if not tokens:
         return "", []
-    clauses = " AND ".join("LOWER(profesor) LIKE ?" for _ in tokens)
+    clauses = " AND ".join("LOWER(profesor) LIKE %s" for _ in tokens)
     params = [f"%{t}%" for t in tokens]
     return f" AND ({clauses})", params
 
@@ -79,35 +80,32 @@ def _profesor_filter(q: str) -> tuple[str, list]:
 @app.get("/api/stats")
 def stats():
     conn = get_conn()
-    row = conn.execute(
-        "SELECT COUNT(*) total, COUNT(DISTINCT profesor) profs, COUNT(DISTINCT ciclo_lectivo) ciclos "
-        "FROM certificados"
-    ).fetchone()
+    row = _fetchone_tuple(
+        conn,
+        "SELECT COUNT(*) AS total, COUNT(DISTINCT profesor) AS profs, "
+        "COUNT(DISTINCT ciclo_lectivo) AS ciclos FROM certificados",
+    )
     conn.close()
     return {
-        "total_records": row["total"],
-        "total_professors": row["profs"],
-        "total_ciclos": row["ciclos"],
+        "total_records": row[0],
+        "total_professors": row[1],
+        "total_ciclos": row[2],
     }
 
 
 @app.get("/api/ciclos")
 def ciclos():
-    if not DB_PATH.exists():
+    if not DATABASE_URL:
         return {"ciclos": []}
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=5000")
-    conn.row_factory = sqlite3.Row
     try:
-        rows = conn.execute(
-            "SELECT DISTINCT ciclo_lectivo FROM certificados ORDER BY ciclo_lectivo"
-        ).fetchall()
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("SELECT DISTINCT ciclo_lectivo FROM certificados ORDER BY ciclo_lectivo")
+        rows = cur.fetchall()
+        conn.close()
     except Exception:
         rows = []
-    finally:
-        conn.close()
-    return {"ciclos": [r["ciclo_lectivo"] for r in rows]}
+    return {"ciclos": [r[0] for r in rows]}
 
 
 @app.get("/api/professors")
@@ -116,7 +114,7 @@ def professors(
     ciclo: str = Query("", description="Single ciclo filter (legacy)"),
     ciclos: str = Query("", description="Comma-separated exact ciclo list"),
 ):
-    ciclo_list = [c.strip() for c in ciclos.split(',') if c.strip()] if ciclos else []
+    ciclo_list = [c.strip() for c in ciclos.split(",") if c.strip()] if ciclos else []
     if ciclo.strip() and ciclo.strip() not in ciclo_list:
         ciclo_list.append(ciclo.strip())
 
@@ -128,11 +126,11 @@ def professors(
         sql += frag
         params.extend(fparams)
     if ciclo_list:
-        placeholders = ','.join('?' * len(ciclo_list))
+        placeholders = ",".join("%s" * len(ciclo_list))
         sql += f" AND ciclo_lectivo IN ({placeholders})"
         params.extend(ciclo_list)
     sql += " ORDER BY profesor LIMIT 50"
-    rows = conn.execute(sql, params).fetchall()
+    rows = _fetchall(conn, sql, params)
     conn.close()
     return {"professors": [r["profesor"] for r in rows if r["profesor"]]}
 
@@ -143,19 +141,25 @@ def certificates(
     ciclo: str = Query("", description="Single ciclo (legacy, partial match)"),
     ciclos: str = Query("", description="Comma-separated exact ciclo list"),
 ):
-    ciclo_list = [c.strip() for c in ciclos.split(',') if c.strip()] if ciclos else []
-    # legacy single-ciclo fallback
+    ciclo_list = [c.strip() for c in ciclos.split(",") if c.strip()] if ciclos else []
     if ciclo.strip() and ciclo.strip() not in ciclo_list:
         ciclo_list.append(ciclo.strip())
 
     if not profesor.strip() and not ciclo_list:
         raise HTTPException(400, "Provide at least one filter: profesor or ciclo.")
+
     conn = get_conn()
-    try:
-        conn.execute("SELECT nombre_curso FROM certificados LIMIT 1")
-        nombre_col = "COALESCE(nombre_curso, materia) AS nombre_curso"
-    except Exception:
-        nombre_col = "materia AS nombre_curso"
+    # Check if nombre_curso column exists (safe, uses information_schema)
+    row_check = _fetchone_tuple(
+        conn,
+        "SELECT COUNT(*) FROM information_schema.columns "
+        "WHERE table_name='certificados' AND column_name='nombre_curso'",
+    )
+    nombre_col = (
+        "COALESCE(nombre_curso, materia) AS nombre_curso"
+        if row_check and row_check[0] > 0
+        else "materia AS nombre_curso"
+    )
 
     sql = (
         f"SELECT profesor, componente, materia, {nombre_col}, ciclo_lectivo, "
@@ -168,11 +172,11 @@ def certificates(
         sql += frag
         params.extend(fparams)
     if ciclo_list:
-        placeholders = ','.join('?' * len(ciclo_list))
+        placeholders = ",".join("%s" * len(ciclo_list))
         sql += f" AND ciclo_lectivo IN ({placeholders})"
         params.extend(ciclo_list)
     sql += " ORDER BY profesor, ciclo_lectivo, nombre_curso"
-    rows = conn.execute(sql, params).fetchall()
+    rows = _fetchall(conn, sql, params)
     conn.close()
     return {"results": [dict(r) for r in rows]}
 
@@ -184,68 +188,96 @@ async def upload(file: UploadFile = File(...)):
     ):
         raise HTTPException(400, "Solo se aceptan archivos .xlsx o .xls")
 
-    content = await file.read()
-
-    # ── pre-check: detect ciclos in uploaded file ─────────────────────────────
+    # ── stream to disk in chunks — zero synchronous pandas work here ──────────
+    tmp_fd, tmp_name = tempfile.mkstemp(suffix=".xlsx")
+    tmp_path = Path(tmp_name)
     try:
-        preview_df = pd.read_excel(io.BytesIO(content), engine="openpyxl", usecols=["Ciclo Lectivo"])
-        incoming = set(str(c) for c in preview_df["Ciclo Lectivo"].dropna().unique())
+        with os.fdopen(tmp_fd, "wb") as f:
+            while True:
+                chunk = await file.read(512 * 1024)  # 512KB chunks
+                if not chunk:
+                    break
+                f.write(chunk)
     except Exception as exc:
-        raise HTTPException(400, f"No se pudo leer el archivo: {exc}") from exc
-
-    if not incoming:
-        raise HTTPException(400, "El archivo no contiene columna 'Ciclo Lectivo' o está vacío.")
-
-    # ── reject if any ciclo already in DB ────────────────────────────────────
-    if DB_PATH.exists():
-        _conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-        _conn.execute("PRAGMA journal_mode=WAL")
-        _conn.execute("PRAGMA busy_timeout=5000")
-        try:
-            existing = {r[0] for r in _conn.execute("SELECT DISTINCT ciclo_lectivo FROM certificados").fetchall()}
-        except Exception:
-            existing = set()
-        finally:
-            _conn.close()
-        overlap = sorted(incoming & existing)
-        if overlap:
-            raise HTTPException(
-                409,
-                {
-                    "message": "El archivo contiene periodos ya cargados en la base de datos.",
-                    "conflicting_ciclos": overlap,
-                },
-            )
-
-    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
-        tmp.write(content)
-        tmp_path = Path(tmp.name)
-
-    try:
-        result = run_etl_on_file(tmp_path, DB_PATH, append=True)
-    except Exception as exc:
-        raise HTTPException(500, str(exc)) from exc
-    finally:
         tmp_path.unlink(missing_ok=True)
+        raise HTTPException(400, f"Error recibiendo el archivo: {exc}") from exc
 
-    return result
+    # ── launch background job immediately ─────────────────────────────────────
+    job_id = str(uuid.uuid4())[:8]
+    _upload_jobs[job_id] = {"status": "processing", "result": None, "error": None}
+
+    def _run_etl(path: Path, jid: str):
+        try:
+            # Validate: check Ciclo Lectivo column
+            preview_df = pd.read_excel(path, engine="calamine", usecols=["Ciclo Lectivo"])
+            incoming = set(str(c) for c in preview_df["Ciclo Lectivo"].dropna().unique())
+            del preview_df
+
+            if not incoming:
+                _upload_jobs[jid] = {
+                    "status": "error",
+                    "result": None,
+                    "error": "El archivo no contiene columna 'Ciclo Lectivo' o está vacío.",
+                }
+                return
+
+            # Check conflicts against PostgreSQL
+            try:
+                _conn = psycopg2.connect(DATABASE_URL)
+                _cur = _conn.cursor()
+                _cur.execute("SELECT DISTINCT ciclo_lectivo FROM certificados")
+                existing = {r[0] for r in _cur.fetchall()}
+                _conn.close()
+            except Exception:
+                existing = set()
+
+            overlap = sorted(incoming & existing)
+            if overlap:
+                _upload_jobs[jid] = {
+                    "status": "conflict",
+                    "result": None,
+                    "error": "El archivo contiene periodos ya cargados en la base de datos.",
+                    "conflicting_ciclos": overlap,
+                }
+                return
+
+            # Run ETL (db_path ignored — uses DATABASE_URL internally)
+            result = run_etl_on_file(path, append=True)
+            _upload_jobs[jid] = {"status": "done", "result": result, "error": None}
+        except Exception as exc:
+            _upload_jobs[jid] = {"status": "error", "result": None, "error": str(exc)}
+        finally:
+            path.unlink(missing_ok=True)
+
+    threading.Thread(target=_run_etl, args=(tmp_path, job_id), daemon=True).start()
+    return {"job_id": job_id, "status": "processing"}
+
+
+@app.get("/api/upload-status/{job_id}")
+def upload_status(job_id: str):
+    job = _upload_jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "Job no encontrado.")
+    return job
 
 
 @app.delete("/api/ciclos/{ciclo_lectivo:path}")
 def delete_ciclo(ciclo_lectivo: str):
     """Delete all records for a specific ciclo_lectivo."""
-    if not DB_PATH.exists():
-        raise HTTPException(404, "No hay base de datos.")
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=5000")
+    conn = get_conn()
+    cur = conn.cursor()
     try:
-        result = conn.execute(
-            "DELETE FROM certificados WHERE ciclo_lectivo = ?", (ciclo_lectivo,)
+        cur.execute("DELETE FROM certificados WHERE ciclo_lectivo = %s", (ciclo_lectivo,))
+        deleted = cur.rowcount
+        # Also clean raw_rows if table exists
+        cur.execute(
+            "SELECT 1 FROM information_schema.tables WHERE table_name = 'raw_rows'"
         )
+        if cur.fetchone():
+            cur.execute("DELETE FROM raw_rows WHERE ciclo_lectivo = %s", (ciclo_lectivo,))
         conn.commit()
-        deleted = result.rowcount
     except Exception as exc:
+        conn.rollback()
         conn.close()
         raise HTTPException(500, str(exc)) from exc
     conn.close()
@@ -256,14 +288,22 @@ def delete_ciclo(ciclo_lectivo: str):
 
 @app.delete("/api/db")
 def reset_db():
-    """Delete the entire database file, resetting the system to a clean state."""
-    if not DB_PATH.exists():
-        raise HTTPException(404, "No hay base de datos que eliminar.")
+    """Wipe all data from certificados and raw_rows tables."""
     try:
-        DB_PATH.unlink()
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM certificados")
+        # Delete raw_rows only if table exists
+        cur.execute(
+            "SELECT 1 FROM information_schema.tables WHERE table_name = 'raw_rows'"
+        )
+        if cur.fetchone():
+            cur.execute("DELETE FROM raw_rows")
+        conn.commit()
+        conn.close()
     except Exception as exc:
-        raise HTTPException(500, f"No se pudo eliminar la base de datos: {exc}") from exc
-    return {"message": "Base de datos eliminada correctamente."}
+        raise HTTPException(500, f"No se pudo limpiar la base de datos: {exc}") from exc
+    return {"message": "Base de datos vaciada correctamente."}
 
 
 def _build_certificate_excel(df: "pd.DataFrame", buf: "io.BytesIO") -> None:
@@ -294,13 +334,12 @@ def _build_certificate_excel(df: "pd.DataFrame", buf: "io.BytesIO") -> None:
     # ── professor info (from first row) ───────────────────────────────────────
     profesor = str(df["profesor"].iloc[0]) if "profesor" in df.columns and len(df) else ""
     id_prof  = str(df["num_doc_docente"].iloc[0]) if "num_doc_docente" in df.columns and len(df) else ""
-    # Normalize NaN/None — num_doc_docente may be float if pandas read it as numeric
     try:
         id_prof = str(int(float(id_prof))) if id_prof not in ("", "nan", "None") else "—"
     except Exception:
         id_prof = id_prof or "—"
 
-    # ── ROW 1: Title ─────────────────────────────────────────────────────────
+    # ── ROW 1: Title ──────────────────────────────────────────────────────────
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=NUM_COLS)
     c = ws.cell(row=1, column=1, value="PROCESO DE CERTIFICACIÓN · FACULTAD DE INGENIERÍA")
     c.font = title_font
@@ -333,7 +372,6 @@ def _build_certificate_excel(df: "pd.DataFrame", buf: "io.BytesIO") -> None:
         c.border = hdr_border
     ws.row_dimensions[4].height = 24
 
-    # ── helper: YYYY-MM-DD → DD/MM/YYYY ──────────────────────────────────────
     def fmt_date(d: object) -> str:
         s = str(d) if d is not None else ""
         if s in ("", "None", "nan"):
@@ -390,12 +428,13 @@ def export(
     ciclos: str = Query("", description="Comma-separated exact ciclo list"),
     format: str = Query("excel", pattern="^(excel|csv)$"),
 ):
-    ciclo_list = [c.strip() for c in ciclos.split(',') if c.strip()] if ciclos else []
+    ciclo_list = [c.strip() for c in ciclos.split(",") if c.strip()] if ciclos else []
     if ciclo.strip() and ciclo.strip() not in ciclo_list:
         ciclo_list.append(ciclo.strip())
 
     if not profesor.strip() and not ciclo_list:
         raise HTTPException(400, "Provide at least one filter.")
+
     conn = get_conn()
     sql = (
         "SELECT profesor, id_profesor, num_doc_docente, componente, materia, "
@@ -409,7 +448,7 @@ def export(
         sql += frag
         params.extend(fparams)
     if ciclo_list:
-        placeholders = ','.join('?' * len(ciclo_list))
+        placeholders = ",".join("%s" * len(ciclo_list))
         sql += f" AND ciclo_lectivo IN ({placeholders})"
         params.extend(ciclo_list)
     sql += " ORDER BY ciclo_lectivo, nombre_curso"
@@ -449,24 +488,73 @@ def debug_etl(
     import traceback, json
     try:
         result = _debug_etl_inner(profesor, ciclo)
-        # Serialize manually — bypasses FastAPI jsonable_encoder which can choke
-        # on residual numpy/pandas types that _safe may have missed.
         return JSONResponse(content=json.loads(json.dumps(result, default=str)))
     except Exception as exc:
         raise HTTPException(500, detail=f"{type(exc).__name__}: {exc}\n\n{traceback.format_exc()}")
 
 
 def _debug_etl_inner(profesor: str, ciclo: str):
-    if not EXCEL_PATH.exists():
-        raise HTTPException(404, f"Excel not found: {EXCEL_PATH.name}. Run ETL from the source file first.")
-
+    import gc
     import numpy as np
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    # Check raw_rows table exists
+    cur.execute(
+        "SELECT 1 FROM information_schema.tables WHERE table_name = 'raw_rows'"
+    )
+    if not cur.fetchone():
+        conn.close()
+        raise HTTPException(
+            503,
+            "Sube un archivo Excel primero para activar esta función.",
+        )
+
+    # Load filtered raw rows from PostgreSQL
+    df_raw_sql = pd.read_sql_query(
+        "SELECT * FROM raw_rows "
+        "WHERE ciclo_lectivo LIKE %s AND UPPER(nombre_profesor) LIKE %s",
+        conn,
+        params=(f"%{ciclo}%", f"%{profesor.upper().strip()}%"),
+    )
+
+    # Fetch global dup hashes (hashes that appear more than once across all rows)
+    cur2 = conn.cursor()
+    cur2.execute(
+        "SELECT row_hash FROM raw_rows GROUP BY row_hash HAVING COUNT(*) > 1"
+    )
+    dup_hashes = {r[0] for r in cur2.fetchall()}
+    conn.close()
+
+    # Rename DB column names back to original Excel column names
+    RENAME_BACK = {
+        "nombre_profesor":    "Nombre profesor",
+        "ciclo_lectivo_raw":  "Ciclo Lectivo",
+        "num_clase":          "Nº Clase",
+        "id_seccion_combinada": "ID Sección Combinada",
+        "hora_inicio":        "Hora Inicio",
+        "hora_final":         "Hora Final",
+        "clase_principal":    "Clase Principal",
+        "descripcion_materia":"Descripción Materia",
+        "nombre_curso":       "Nombre del curso",
+        "dia":                "Día",
+        "id_instalacion":     "ID Instalación",
+        "componente_desc":    "Componente Descripción",
+        "tipo_dedicacion":    "Tipo dedicación",
+        "id_profesor":        "Id profesor",
+        "descripcion_1":      "Descripción.1",
+    }
+    hashes = df_raw_sql["row_hash"].values
+    df_raw = df_raw_sql.rename(columns=RENAME_BACK).drop(
+        columns=["ciclo_lectivo", "row_hash"], errors="ignore"
+    )
+    del df_raw_sql; gc.collect()
 
     # ── helpers ───────────────────────────────────────────────────────────────
     def _safe(v):
         if v is None:
             return None
-        # Catch all NA variants: float NaN, np.nan, pd.NaT, pd.NA
         try:
             if pd.isna(v):
                 return None
@@ -481,25 +569,22 @@ def _debug_etl_inner(profesor: str, ciclo: str):
             return None if (np.isnan(v) or np.isinf(v)) else round(v, 4)
         if isinstance(v, np.bool_):
             return bool(v)
-        if hasattr(v, 'isoformat'):   # pd.Timestamp, datetime.datetime, date
+        if hasattr(v, "isoformat"):
             return str(v)
         return v
 
     def to_records(df, cols):
         available = [c for c in cols if c in df.columns]
-        # to_dict first (gives Python dicts with raw np/pd types),
-        # then sanitize each value — avoids pandas re-converting None→nan
-        # in float columns when using Series.map.
         raw = df[available].to_dict("records")
         return [
             {k: _safe(v) for k, v in row.items()}
             for row in raw
         ], available
 
-    # Try both accent variants for the room column
-    def find_col(df, *candidates):
+    def find_col_nonempty(df, *candidates):
+        """Return first candidate that exists in df AND has at least one non-null value."""
         for c in candidates:
-            if c in df.columns:
+            if c in df.columns and df[c].notna().any():
                 return c
         return None
 
@@ -509,12 +594,9 @@ def _debug_etl_inner(profesor: str, ciclo: str):
         "Clase Principal", "Descripción Materia", "Nombre del curso",
     ]
 
-    # ── Read raw Excel ────────────────────────────────────────────────────────
-    df_full = pd.read_excel(EXCEL_PATH, engine="openpyxl")
-
-    # Detect day and room columns dynamically
-    day_col  = find_col(df_full, "Día", "Dia", "Día de la semana", "Dia semana")
-    inst_col = find_col(df_full, "ID Instalación", "ID Instalacion", "ID Instalacion ", "Instalación")
+    # Detect optional columns
+    day_col  = find_col_nonempty(df_raw, "Día", "Dia", "Día de la semana", "Dia semana")
+    inst_col = find_col_nonempty(df_raw, "ID Instalación", "ID Instalacion", "ID Instalacion ", "Instalación")
 
     display_cols = BASE_COLS.copy()
     if day_col:
@@ -522,15 +604,9 @@ def _debug_etl_inner(profesor: str, ciclo: str):
     if inst_col:
         display_cols.append(inst_col)
 
-    ciclo_mask = df_full["Ciclo Lectivo"].astype(str).str.contains(ciclo, case=False, na=False)
-    prof_mask  = df_full["Nombre profesor"].astype(str).str.upper().str.contains(
-        profesor.upper().strip(), na=False
-    )
-
     steps = []
 
     # ══ STEP 1 — Raw rows ════════════════════════════════════════════════════
-    df_raw = df_full[ciclo_mask & prof_mask].copy()
     rows, cols = to_records(df_raw, display_cols)
     steps.append({
         "step": 1,
@@ -544,13 +620,15 @@ def _debug_etl_inner(profesor: str, ciclo: str):
         "rows": rows,
     })
 
-    # ══ STEP 2 — Global dedup ════════════════════════════════════════════════
-    df_dedup_full = df_full.drop_duplicates()
-    # Reindex mask to deduped frame's index to avoid alignment warning
-    dedup_mask = (ciclo_mask & prof_mask).reindex(df_dedup_full.index, fill_value=False)
-    df_dedup = df_dedup_full[dedup_mask].copy()
-    dropped_idx = df_raw.index.difference(df_dedup.index)
-    dropped_dedup = df_raw.loc[df_raw.index.isin(dropped_idx)]
+    # ══ STEP 2 — Global dedup (reconstructed via row_hash) ════════════════════
+    dup_series  = pd.Series(hashes)
+    is_dup_hash = dup_series.isin(dup_hashes)
+    is_dup_pos  = dup_series.duplicated(keep="first")
+    removed     = is_dup_hash & is_dup_pos
+    df_dedup      = df_raw[~removed.values].copy()
+    dropped_dedup = df_raw[removed.values].copy()
+    del df_raw; gc.collect()
+
     dr, _ = to_records(dropped_dedup, display_cols)
     rows, cols = to_records(df_dedup, display_cols)
     steps.append({
@@ -579,7 +657,7 @@ def _debug_etl_inner(profesor: str, ciclo: str):
         "rows": rows,
     })
 
-    # ══ STEP 2 — Assign grupo_id ══════════════════════════════════════════════
+    # ══ STEP 4 — Assign grupo_id ══════════════════════════════════════════════
     sem_df = df_dedup.copy()
     has_combined = (
         sem_df["ID Sección Combinada"].notna()
@@ -602,7 +680,7 @@ def _debug_etl_inner(profesor: str, ciclo: str):
         "rows": rows,
     })
 
-    # ══ STEP 2b — Dedup combined sections ════════════════════════════════════
+    # ══ STEP 5 — Dedup combined sections ════════════════════════════════════
     if inst_col and inst_col in sem_df.columns:
         dedup_subset = ["grupo_id", "Hora Inicio", "Hora Final", inst_col]
         combined_before = sem_df[has_combined].copy()
@@ -638,7 +716,7 @@ def _debug_etl_inner(profesor: str, ciclo: str):
             "rows": rows,
         })
 
-    # ══ STEP 3-4 — Parse times + duration ════════════════════════════════════
+    # ══ STEP 6 — Parse times + duration ═════════════════════════════════════
     sem_df2["_h_ini"] = sem_df2["Hora Inicio"].apply(parse_hour)
     sem_df2["_h_fin"] = sem_df2["Hora Final"].apply(parse_hour)
     sem_df2["_dur"]   = (sem_df2["_h_fin"] - sem_df2["_h_ini"]).clip(lower=0)
@@ -656,9 +734,9 @@ def _debug_etl_inner(profesor: str, ciclo: str):
         "rows": rows,
     })
 
-    # ══ STEP 5-6 — Aggregate + × 16 ══════════════════════════════════════════
+    # ══ STEP 7 — Aggregate + × 16 ═════════════════════════════════════════════
     if "Descripción.1" in sem_df2.columns:
-        sem_df2["_dpto"] = sem_df2["Descripción.1"].fillna(sem_df2["Departamento"].astype(str))
+        sem_df2["_dpto"] = sem_df2["Descripción.1"].fillna("").astype(str)
     elif "Departamento" in sem_df2.columns:
         sem_df2["_dpto"] = sem_df2["Departamento"].astype(str)
     else:
@@ -697,13 +775,13 @@ def _debug_etl_inner(profesor: str, ciclo: str):
 
     # ══ STEP 8 — Merge same materia+nombre_curso ══════════════════════════════
     cert_renamed = cert.rename(columns={
-        "Nombre profesor": "profesor",
-        "Id profesor": "id_profesor",
-        "Ciclo Lectivo": "ciclo_lectivo",
-        "Descripción Materia": "materia",
+        "Nombre profesor":      "profesor",
+        "Id profesor":          "id_profesor",
+        "Ciclo Lectivo":        "ciclo_lectivo",
+        "Descripción Materia":  "materia",
         "Componente Descripción": "componente",
-        "_dpto": "departamento",
-        "Tipo dedicación": "tipo_dedicacion",
+        "_dpto":                "departamento",
+        "Tipo dedicación":      "tipo_dedicacion",
     })
 
     merge_keys = [k for k in [
@@ -718,7 +796,6 @@ def _debug_etl_inner(profesor: str, ciclo: str):
             .reset_index()
         )
 
-        # Find rows that were merged (appear multiple times with same materia+nombre_curso)
         merge_id_cols = [k for k in ["materia", "nombre_curso"] if k in cert_renamed.columns]
         if merge_id_cols:
             dup_mask = cert_renamed.duplicated(subset=merge_id_cols, keep=False)
@@ -726,11 +803,8 @@ def _debug_etl_inner(profesor: str, ciclo: str):
         else:
             merged_source_rows = cert_renamed.iloc[0:0]
 
-        show8_before = ["materia", "nombre_curso", "horas_semestre", "num_grupos"]
-        show8_after  = ["materia", "nombre_curso", "horas_semestre", "num_grupos"]
-        dr8, _   = to_records(merged_source_rows, show8_before)
-        rows8, cols8 = to_records(cert_merged, show8_after)
-
+        dr8, _   = to_records(merged_source_rows, ["materia", "nombre_curso", "horas_semestre", "num_grupos"])
+        rows8, cols8 = to_records(cert_merged,       ["materia", "nombre_curso", "horas_semestre", "num_grupos"])
         removed8 = len(cert_renamed) - len(cert_merged)
         steps.append({
             "step": 8,
@@ -760,7 +834,7 @@ def _debug_etl_inner(profesor: str, ciclo: str):
     return {
         "profesor": profesor,
         "ciclo": ciclo,
-        "excel": EXCEL_PATH.name,
+        "excel": "PostgreSQL (raw_rows)",
         "day_col": day_col,
         "inst_col": inst_col,
         "steps": steps,

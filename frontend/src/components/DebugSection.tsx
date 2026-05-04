@@ -204,8 +204,15 @@ export function DebugSection() {
 
       {/* Error */}
       {error && (
-        <div className="rounded-lg border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {error}
+        <div className={cn(
+          'rounded-xl px-4 py-3 text-sm',
+          error.includes('archivo Excel') || error.includes('fuente')
+            ? 'border border-amber-400/20 bg-amber-500/10 text-amber-200'
+            : 'border border-red-400/20 bg-red-500/10 text-red-200'
+        )}>
+          {error.includes('archivo Excel') || error.includes('fuente')
+            ? '⚠️ Esta función de trazado ETL requiere el archivo Excel fuente cargado en el servidor. En el entorno desplegado, sube primero el archivo en la pestaña "Cargar Datos".'
+            : error}
         </div>
       )}
 

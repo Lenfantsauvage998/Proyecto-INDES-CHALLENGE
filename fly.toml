@@ -7,6 +7,7 @@ primary_region = "gru"
 [env]
   PORT = "8001"
   DB_PATH = "/data/teaching.db"
+  EXCEL_PATH = "/data/source.xlsx"
 
 [[mounts]]
   source = "isse_data"
@@ -27,6 +28,6 @@ primary_region = "gru"
   timeout = "5s"
 
 [[vm]]
-  memory = "256mb"
+  memory = "1gb"
   cpu_kind = "shared"
   cpus = 1

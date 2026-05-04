@@ -70,6 +70,7 @@ export function UploadSection({ onSuccess, addToast, refreshKey }: Props) {
     const form = new FormData()
     form.append('file', file)
     try {
+      // Step 1: start upload — server returns immediately with job_id
       const res = await fetch('/api/upload', { method: 'POST', body: form })
       const data = await res.json()
       if (!res.ok) {
@@ -81,14 +82,61 @@ export function UploadSection({ onSuccess, addToast, refreshKey }: Props) {
         }
         throw new Error(data.detail || 'Error en el servidor')
       }
-      setResult(data)
-      setState('success')
-      addToast({
-        type: 'success',
-        title: `${data.new_records} registros nuevos cargados`,
-        message: data.new_ciclos.length ? `Periodos: ${data.new_ciclos.join(', ')}` : 'No había periodos nuevos',
-      })
-      onSuccess()
+
+      // Step 2: poll for job completion (ETL runs in background)
+      const jobId = data.job_id
+      if (jobId) {
+        await new Promise<void>((resolve, reject) => {
+          let notFoundStreak = 0
+          const interval = setInterval(async () => {
+            try {
+              const statusRes = await fetch(`/api/upload-status/${jobId}`)
+              if (statusRes.status === 404) {
+                notFoundStreak++
+                // Server restarted (OOM) — job lost after 3 consecutive 404s
+                if (notFoundStreak >= 3) {
+                  clearInterval(interval)
+                  reject(new Error('El servidor reinició durante el procesamiento (memoria insuficiente). Intenta de nuevo; si persiste, contacta al administrador.'))
+                }
+                return
+              }
+              notFoundStreak = 0
+              const status = await statusRes.json()
+              if (status.status === 'done') {
+                clearInterval(interval)
+                setResult(status.result)
+                setState('success')
+                addToast({
+                  type: 'success',
+                  title: `${status.result?.new_records ?? 0} registros nuevos cargados`,
+                  message: status.result?.new_ciclos?.length
+                    ? `Periodos: ${status.result.new_ciclos.join(', ')}`
+                    : 'No había periodos nuevos',
+                })
+                onSuccess()
+                resolve()
+              } else if (status.status === 'conflict') {
+                clearInterval(interval)
+                setConflictCiclos(status.conflicting_ciclos ?? [])
+                setState('error')
+                setErrorMsg(status.error ?? 'Periodos duplicados detectados.')
+                resolve()
+              } else if (status.status === 'error') {
+                clearInterval(interval)
+                reject(new Error(status.error || 'Error en el servidor'))
+              }
+            } catch (e) {
+              clearInterval(interval)
+              reject(e)
+            }
+          }, 2000)
+        })
+      } else {
+        // Legacy sync response (fallback)
+        setResult(data)
+        setState('success')
+        onSuccess()
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error desconocido'
       setState('error')

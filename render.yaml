@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: isse-certificados
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/stats
+    envVars:
+      - key: DATABASE_URL
+        sync: false        # paste Neon connection string in Render dashboard
+      - key: PORT
+        value: "8001"

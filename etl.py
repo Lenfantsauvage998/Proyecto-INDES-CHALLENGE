@@ -1,5 +1,5 @@
 """
-ETL pipeline: PREGRADO_CONSOLIDADO_2016_2_2026_1.xlsx → output/teaching.db
+ETL pipeline: PREGRADO_CONSOLIDADO_2016_2_2026_1.xlsx → PostgreSQL (via SQLAlchemy)
 
 Business rules:
   1.  Drop exact duplicate rows
@@ -11,19 +11,22 @@ Business rules:
   6.  weekly_hours * 16 → semester hours
 """
 
+import gc
+import hashlib
 import os
 import re
-import sqlite3
 import sys
 from pathlib import Path
 
 import pandas as pd
+from sqlalchemy import create_engine, text
+
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 BASE_DIR = Path(__file__).parent
-EXCEL_PATH = BASE_DIR / "PREGRADO_CONSOLIDADO_2016_2_2026_1.xlsx"
+# DB_PATH kept for backward compat / local fallback only
 _db_env = os.environ.get("DB_PATH")
 DB_PATH = Path(_db_env) if _db_env else BASE_DIR / "output" / "teaching.db"
-
 
 SEMESTER_DATES = {
     "1": ("02-01", "06-30"),
@@ -83,9 +86,6 @@ def _transform(df: pd.DataFrame) -> pd.DataFrame:
         )
 
         # ── 2b. Dedup combined sections: same physical session = same room + time
-        #   Within one ID Sección Combinada, multiple courses can share the exact
-        #   same Hora Inicio / Hora Final / room — they are ONE session repeated
-        #   per merged course. Keep one row; do NOT sum or hours inflate.
         combined_rows = sem_df[has_combined].drop_duplicates(
             subset=["grupo_id", "Hora Inicio", "Hora Final", "ID Instalación"]
         )
@@ -151,7 +151,6 @@ def _transform(df: pd.DataFrame) -> pd.DataFrame:
     })
 
     # ── 8. Merge rows with identical materia + nombre_curso ───────────────────
-    #   Two different grupo_ids for the same course → one certificate entry.
     merge_keys = [
         "ciclo_lectivo",
         "profesor",
@@ -191,39 +190,109 @@ def _transform(df: pd.DataFrame) -> pd.DataFrame:
     ]]
 
 
-def run_etl_on_file(excel_path: Path, db_path: Path, append: bool = False) -> dict:
+def _row_hash(row) -> str:
+    return hashlib.md5("|".join(str(v) for v in row).encode()).hexdigest()
+
+
+def _save_raw_rows(df: pd.DataFrame, engine, if_exists: str) -> None:
+    """Store pre-transform Excel rows in raw_rows table. Enables debug without Excel file."""
+    col_map = {
+        "Nombre profesor":        "nombre_profesor",
+        "Ciclo Lectivo":          "ciclo_lectivo_raw",
+        "Nº Clase":               "num_clase",
+        "ID Sección Combinada":   "id_seccion_combinada",
+        "Hora Inicio":            "hora_inicio",
+        "Hora Final":             "hora_final",
+        "Clase Principal":        "clase_principal",
+        "Descripción Materia":    "descripcion_materia",
+        "Nombre del curso":       "nombre_curso",
+        "Componente Descripción": "componente_desc",
+        "Tipo dedicación":        "tipo_dedicacion",
+        "Id profesor":            "id_profesor",
+        "Descripción.1":          "descripcion_1",
+    }
+    optional_map = {
+        "Día":            "dia",
+        "Dia":            "dia",
+        "ID Instalación": "id_instalacion",
+        "ID Instalacion": "id_instalacion",
+    }
+    raw = pd.DataFrame()
+    for excel_col, db_col in col_map.items():
+        raw[db_col] = df[excel_col] if excel_col in df.columns else None
+    seen: set = set()
+    for excel_col, db_col in optional_map.items():
+        if db_col not in seen and excel_col in df.columns:
+            raw[db_col] = df[excel_col]
+            seen.add(db_col)
+    if "dia" not in seen:
+        raw["dia"] = None
+    if "id_instalacion" not in seen:
+        raw["id_instalacion"] = None
+    raw["ciclo_lectivo"] = raw["ciclo_lectivo_raw"].astype(str)
+    raw["row_hash"] = [_row_hash(row) for row in df.itertuples(index=False)]
+    raw.to_sql("raw_rows", engine, if_exists=if_exists, index=False)
+    with engine.connect() as c:
+        c.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_raw_rows_ciclo_prof "
+            "ON raw_rows(ciclo_lectivo, nombre_profesor)"
+        ))
+        c.commit()
+    del raw
+
+
+def _table_exists(engine, name: str) -> bool:
+    with engine.connect() as c:
+        return bool(c.execute(
+            text("SELECT 1 FROM information_schema.tables WHERE table_name = :n"),
+            {"n": name},
+        ).fetchone())
+
+
+def run_etl_on_file(excel_path: Path, db_path=None, append: bool = False) -> dict:
     """
-    Run ETL on excel_path → db_path.
+    Run ETL on excel_path → PostgreSQL (DATABASE_URL).
+    db_path is ignored (kept for backward compat).
     If append=True: skip ciclos already present in DB.
     Returns summary dict.
     """
-    df = pd.read_excel(excel_path, engine="openpyxl")
-    cert = _transform(df)
-
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    engine = create_engine(DATABASE_URL)
+    df = pd.read_excel(excel_path, engine="calamine")
 
     skipped_ciclos: list[str] = []
     new_ciclos: list[str] = []
 
-    if append and _table_exists(conn, "certificados"):
-        existing = {r[0] for r in conn.execute("SELECT DISTINCT ciclo_lectivo FROM certificados").fetchall()}
-        incoming = set(cert["ciclo_lectivo"].dropna().unique())
+    if append and _table_exists(engine, "certificados"):
+        with engine.connect() as c:
+            existing = {r[0] for r in c.execute(
+                text("SELECT DISTINCT ciclo_lectivo FROM certificados")
+            ).fetchall()}
+        incoming = set(df["Ciclo Lectivo"].astype(str).dropna().unique())
         skipped_ciclos = sorted(existing & incoming)
-        new_ciclo_set = incoming - existing
-        new_ciclos = sorted(new_ciclo_set)
-        cert = cert[cert["ciclo_lectivo"].isin(new_ciclo_set)]
-        if_exists = "append"
+        new_ciclo_set  = incoming - existing
+        new_ciclos     = sorted(new_ciclo_set)
+        df_new = df[df["Ciclo Lectivo"].astype(str).isin(new_ciclo_set)].copy()
+        raw_if_exists  = "append"
+        cert_if_exists = "append"
     else:
-        new_ciclos = sorted(cert["ciclo_lectivo"].dropna().unique().tolist())
-        if_exists = "replace"
+        df_new = df.copy()
+        new_ciclos     = sorted(df_new["Ciclo Lectivo"].astype(str).dropna().unique().tolist())
+        raw_if_exists  = "replace"
+        cert_if_exists = "replace"
 
-    cert.to_sql("certificados", conn, if_exists=if_exists, index=False)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_profesor ON certificados(profesor)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_ciclo    ON certificados(ciclo_lectivo)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_materia  ON certificados(materia)")
-    conn.commit()
-    conn.close()
+    del df; gc.collect()
+
+    _save_raw_rows(df_new, engine, raw_if_exists)
+
+    cert = _transform(df_new)
+    del df_new; gc.collect()
+
+    cert.to_sql("certificados", engine, if_exists=cert_if_exists, index=False)
+    with engine.connect() as c:
+        c.execute(text("CREATE INDEX IF NOT EXISTS idx_profesor ON certificados(profesor)"))
+        c.execute(text("CREATE INDEX IF NOT EXISTS idx_ciclo    ON certificados(ciclo_lectivo)"))
+        c.execute(text("CREATE INDEX IF NOT EXISTS idx_materia  ON certificados(materia)"))
+        c.commit()
 
     return {
         "new_records": len(cert),
@@ -232,36 +301,37 @@ def run_etl_on_file(excel_path: Path, db_path: Path, append: bool = False) -> di
     }
 
 
-def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
-    return bool(conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
-    ).fetchone())
-
-
 def run_etl():
-    print(f"Reading {EXCEL_PATH.name} …")
-    raw = pd.read_excel(EXCEL_PATH, engine="openpyxl")
+    if len(sys.argv) < 2:
+        print("Usage: python etl.py <path-to-excel.xlsx>")
+        print(f"Requires DATABASE_URL env var pointing to PostgreSQL.")
+        sys.exit(1)
+    excel_path = Path(sys.argv[1])
+    if not excel_path.exists():
+        print(f"File not found: {excel_path}")
+        sys.exit(1)
+
+    print(f"Reading {excel_path.name} …")
+    raw = pd.read_excel(excel_path, engine="calamine")
     print(f"  Raw rows: {len(raw)}")
 
     cert = _transform(raw)
-    print(f"  After dedup + Clase Principal filter: {len(cert)} certificate records")
+    print(f"  After transform: {len(cert)} certificate records")
 
     for col in ("profesor", "materia", "ciclo_lectivo", "horas_semestre"):
         n = cert[col].isna().sum()
         if n:
             print(f"  WARNING: {n} nulls in '{col}'")
 
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    cert.to_sql("certificados", conn, if_exists="replace", index=False)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_profesor ON certificados(profesor)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_ciclo    ON certificados(ciclo_lectivo)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_materia  ON certificados(materia)")
-    conn.commit()
-    conn.close()
+    engine = create_engine(DATABASE_URL)
+    cert.to_sql("certificados", engine, if_exists="replace", index=False)
+    with engine.connect() as c:
+        c.execute(text("CREATE INDEX IF NOT EXISTS idx_profesor ON certificados(profesor)"))
+        c.execute(text("CREATE INDEX IF NOT EXISTS idx_ciclo    ON certificados(ciclo_lectivo)"))
+        c.execute(text("CREATE INDEX IF NOT EXISTS idx_materia  ON certificados(materia)"))
+        c.commit()
 
-    print(f"\nDone. DB saved to: {DB_PATH}")
-    print(f"Table 'certificados': {len(cert)} rows")
+    print(f"\nDone. {len(cert)} rows loaded to PostgreSQL.")
 
 
 if __name__ == "__main__":
