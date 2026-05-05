@@ -1,4 +1,4 @@
-import { Download, FileSpreadsheet, FileText } from 'lucide-react'
+import { Download, FileSpreadsheet, FileText, FileType2 } from 'lucide-react'
 
 export interface Certificate {
   profesor: string
@@ -29,7 +29,7 @@ export function CertificateTable({ data, profesorFilter, ciclosFilter }: Props) 
   const totalSesiones = sorted.reduce((s, r) => s + r.horas_semestre, 0)
   const showCiclo = ciclosFilter.length > 1
 
-  const exportData = async (format: 'csv' | 'excel') => {
+  const exportData = async (format: 'csv' | 'excel' | 'word') => {
     const params = new URLSearchParams()
     if (profesorFilter) params.set('profesor', profesorFilter)
     if (ciclosFilter.length) params.set('ciclos', ciclosFilter.join(','))
@@ -39,7 +39,8 @@ export function CertificateTable({ data, profesorFilter, ciclosFilter }: Props) 
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `certificado_${(profesorFilter || ciclosFilter[0] || 'todos').replace(/\s+/g, '_')}.${format === 'excel' ? 'xlsx' : 'csv'}`
+    const ext = format === 'excel' ? 'xlsx' : format === 'word' ? 'docx' : 'csv'
+    a.download = `certificado_${(profesorFilter || ciclosFilter[0] || 'todos').replace(/\s+/g, '_')}.${ext}`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -61,6 +62,13 @@ export function CertificateTable({ data, profesorFilter, ciclosFilter }: Props) 
           <button onClick={() => exportData('excel')} className="btn-primary flex items-center gap-1.5 text-xs">
             <FileSpreadsheet className="w-3 h-3" />
             <Download className="w-3 h-3" /> Excel
+          </button>
+          <button
+            onClick={() => exportData('word')}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-blue-500/40 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 hover:text-blue-100 transition-colors duration-150"
+          >
+            <FileType2 className="w-3.5 h-3.5" />
+            <Download className="w-3 h-3" /> Word
           </button>
         </div>
       </div>

@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ ./backend/
 COPY etl.py .
+COPY Plantilla_Certificacion.docx .
 
 # React build from first stage
 COPY --from=frontend-build /frontend/dist ./frontend/dist/

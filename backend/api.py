@@ -311,6 +311,17 @@ def reset_db():
     return {"message": "Base de datos vaciada correctamente."}
 
 
+def _fmt_date(d: object) -> str:
+    s = str(d) if d is not None else ""
+    if s in ("", "None", "nan"):
+        return ""
+    try:
+        y, m, day = s[:10].split("-")
+        return f"{day}/{m}/{y}"
+    except Exception:
+        return s
+
+
 def _build_certificate_excel(df: "pd.DataFrame", buf: "io.BytesIO") -> None:
     """Build Excel certificate: professor header + 7-column data table."""
     from openpyxl import Workbook
@@ -377,16 +388,6 @@ def _build_certificate_excel(df: "pd.DataFrame", buf: "io.BytesIO") -> None:
         c.border = hdr_border
     ws.row_dimensions[4].height = 24
 
-    def fmt_date(d: object) -> str:
-        s = str(d) if d is not None else ""
-        if s in ("", "None", "nan"):
-            return ""
-        try:
-            y, m, day = s[:10].split("-")
-            return f"{day}/{m}/{y}"
-        except Exception:
-            return s
-
     # ── DATA ROWS (sorted ciclo low → high, merged SEMESTRE column) ───────────
     row_num = 5
     for ciclo, group in df.groupby("ciclo_lectivo", sort=True):
@@ -398,8 +399,8 @@ def _build_certificate_excel(df: "pd.DataFrame", buf: "io.BytesIO") -> None:
                 (record.get("nombre_curso") or record.get("materia") or "").upper(),
                 int(record["horas_semestre"]),
                 (record.get("departamento") or "").upper(),
-                fmt_date(record.get("fecha_inicio")),
-                fmt_date(record.get("fecha_fin")),
+                _fmt_date(record.get("fecha_inicio")),
+                _fmt_date(record.get("fecha_fin")),
             ]
             aligns = [center, center, left, center, left, center, center]
 
@@ -426,12 +427,130 @@ def _build_certificate_excel(df: "pd.DataFrame", buf: "io.BytesIO") -> None:
     wb.save(buf)
 
 
+def _build_certificate_word(df: "pd.DataFrame", buf: "io.BytesIO") -> None:
+    """Fill Plantilla_Certificacion.docx with professor name and certificate table."""
+    from docx import Document
+    from docx.shared import Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    template_path = BASE_DIR / "Plantilla_Certificacion.docx"
+    doc = Document(str(template_path))
+
+    profesor = str(df["profesor"].iloc[0]) if "profesor" in df.columns and len(df) else "—"
+
+    # ── 1. Replace {{Nombre profesor}} in all paragraphs ─────────────────────
+    for para in doc.paragraphs:
+        if "{{Nombre profesor}}" in para.text:
+            # Rebuild runs to avoid split-run issues
+            full_text = para.text.replace("{{Nombre profesor}}", profesor)
+            for run in para.runs:
+                run.text = ""
+            if para.runs:
+                para.runs[0].text = full_text
+            else:
+                para.add_run(full_text)
+
+    # ── 2. Find {{tabla}} paragraph ──────────────────────────────────────────
+    tabla_para = None
+    for para in doc.paragraphs:
+        if "{{tabla}}" in para.text:
+            tabla_para = para
+            break
+
+    if tabla_para is None:
+        doc.save(buf)
+        return
+
+    # ── 3. Build the table at end of doc then move XML ───────────────────────
+    def _set_cell_border(cell):
+        """Apply thin black border to all sides of a cell."""
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        tcBorders = OxmlElement("w:tcBorders")
+        for side in ("top", "left", "bottom", "right"):
+            el = OxmlElement(f"w:{side}")
+            el.set(qn("w:val"), "single")
+            el.set(qn("w:sz"), "4")
+            el.set(qn("w:space"), "0")
+            el.set(qn("w:color"), "000000")
+            tcBorders.append(el)
+        tcPr.append(tcBorders)
+
+    headers = ["SEMESTRE", "ASIGNATURA", "SESIONES", "DEPARTAMENTO", "FECHA INICIO", "FECHA FIN"]
+
+    table = doc.add_table(rows=1, cols=len(headers))
+    table.style = "Normal Table"
+
+    # Header row
+    hdr_row = table.rows[0]
+    for j, h in enumerate(headers):
+        cell = hdr_row.cells[j]
+        cell.text = h
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.runs[0]
+        run.bold = True
+        run.font.size = Pt(9)
+        run.font.color.rgb = RGBColor(0x00, 0x00, 0x00)
+        # Light grey shading
+        tc = cell._tc
+        tcPr = tc.get_or_add_tcPr()
+        shd = OxmlElement("w:shd")
+        shd.set(qn("w:val"), "clear")
+        shd.set(qn("w:color"), "auto")
+        shd.set(qn("w:fill"), "BFBFBF")
+        tcPr.append(shd)
+        _set_cell_border(cell)
+
+    # Data rows
+    sorted_df = df.sort_values(["ciclo_lectivo", "nombre_curso"] if "nombre_curso" in df.columns else ["ciclo_lectivo"])
+    for _, record in sorted_df.iterrows():
+        cells = table.add_row().cells
+        values = [
+            str(record.get("ciclo_lectivo", "")),
+            (str(record.get("nombre_curso") or record.get("materia") or "")).upper(),
+            str(int(record.get("horas_semestre", 0))),
+            (str(record.get("departamento") or "")).upper(),
+            _fmt_date(record.get("fecha_inicio")),
+            _fmt_date(record.get("fecha_fin")),
+        ]
+        aligns = [
+            WD_ALIGN_PARAGRAPH.CENTER,
+            WD_ALIGN_PARAGRAPH.LEFT,
+            WD_ALIGN_PARAGRAPH.CENTER,
+            WD_ALIGN_PARAGRAPH.LEFT,
+            WD_ALIGN_PARAGRAPH.CENTER,
+            WD_ALIGN_PARAGRAPH.CENTER,
+        ]
+        for cell, val, aln in zip(cells, values, aligns):
+            p = cell.paragraphs[0]
+            p.text = val
+            p.alignment = aln
+            for run in p.runs:
+                run.font.size = Pt(9)
+            _set_cell_border(cell)
+
+    # Move table element to where {{tabla}} was
+    body = tabla_para._element.getparent()
+    tabla_idx = list(body).index(tabla_para._element)
+    tbl_elem = table._element
+    tbl_elem.getparent().remove(tbl_elem)
+    body.insert(tabla_idx, tbl_elem)
+
+    # Remove {{tabla}} placeholder paragraph
+    body.remove(tabla_para._element)
+
+    doc.save(buf)
+
+
 @app.get("/api/export")
 def export(
     profesor: str = Query(""),
     ciclo: str = Query("", description="Single ciclo (legacy)"),
     ciclos: str = Query("", description="Comma-separated exact ciclo list"),
-    format: str = Query("excel", pattern="^(excel|csv)$"),
+    format: str = Query("excel", pattern="^(excel|csv|word)$"),
 ):
     ciclo_list = [c.strip() for c in ciclos.split(",") if c.strip()] if ciclos else []
     if ciclo.strip() and ciclo.strip() not in ciclo_list:
@@ -465,6 +584,10 @@ def export(
         _build_certificate_excel(df, buf)
         media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         filename = "certificado.xlsx"
+    elif format == "word":
+        _build_certificate_word(df, buf)
+        media = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        filename = "certificado.docx"
     else:
         csv_cols = ["profesor", "num_doc_docente", "ciclo_lectivo", "componente",
                     "nombre_curso", "horas_semestre", "departamento", "fecha_inicio", "fecha_fin"]
