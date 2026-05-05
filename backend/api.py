@@ -79,18 +79,23 @@ def _profesor_filter(q: str) -> tuple[str, list]:
 # ── endpoints ────────────────────────────────────────────────────────────────
 @app.get("/api/stats")
 def stats():
-    conn = get_conn()
-    row = _fetchone_tuple(
-        conn,
-        "SELECT COUNT(*) AS total, COUNT(DISTINCT profesor) AS profs, "
-        "COUNT(DISTINCT ciclo_lectivo) AS ciclos FROM certificados",
-    )
-    conn.close()
-    return {
-        "total_records": row[0],
-        "total_professors": row[1],
-        "total_ciclos": row[2],
-    }
+    try:
+        conn = get_conn()
+        row = _fetchone_tuple(
+            conn,
+            "SELECT COUNT(*) AS total, COUNT(DISTINCT profesor) AS profs, "
+            "COUNT(DISTINCT ciclo_lectivo) AS ciclos FROM certificados",
+        )
+        conn.close()
+        return {
+            "total_records": row[0],
+            "total_professors": row[1],
+            "total_ciclos": row[2],
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        return {"total_records": 0, "total_professors": 0, "total_ciclos": 0, "error": str(exc)}
 
 
 @app.get("/api/ciclos")
@@ -126,7 +131,7 @@ def professors(
         sql += frag
         params.extend(fparams)
     if ciclo_list:
-        placeholders = ",".join("%s" * len(ciclo_list))
+        placeholders = ",".join(["%s"] * len(ciclo_list))
         sql += f" AND ciclo_lectivo IN ({placeholders})"
         params.extend(ciclo_list)
     sql += " ORDER BY profesor LIMIT 50"
@@ -172,7 +177,7 @@ def certificates(
         sql += frag
         params.extend(fparams)
     if ciclo_list:
-        placeholders = ",".join("%s" * len(ciclo_list))
+        placeholders = ",".join(["%s"] * len(ciclo_list))
         sql += f" AND ciclo_lectivo IN ({placeholders})"
         params.extend(ciclo_list)
     sql += " ORDER BY profesor, ciclo_lectivo, nombre_curso"
@@ -448,7 +453,7 @@ def export(
         sql += frag
         params.extend(fparams)
     if ciclo_list:
-        placeholders = ",".join("%s" * len(ciclo_list))
+        placeholders = ",".join(["%s"] * len(ciclo_list))
         sql += f" AND ciclo_lectivo IN ({placeholders})"
         params.extend(ciclo_list)
     sql += " ORDER BY ciclo_lectivo, nombre_curso"
