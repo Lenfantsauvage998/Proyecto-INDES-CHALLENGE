@@ -1,5 +1,6 @@
-import { Download, FileSpreadsheet, FileText } from 'lucide-react'
-
+import { Download, FileSpreadsheet, FileText, FileDown } from 'lucide-react'
+import { PDFDownloadLink } from '@react-pdf/renderer'
+import { CertificatePDF } from './CertificatePDF'
 export interface Certificate {
   profesor: string
   componente: string
@@ -55,6 +56,17 @@ export function CertificateTable({ data, profesorFilter, ciclosFilter }: Props) 
           <span className="text-white font-semibold">{totalSesiones}</span> sesiones totales
         </p>
         <div className="flex gap-2">
+          <PDFDownloadLink
+            document={<CertificatePDF data={sorted} profesorName={sorted.length > 0 ? sorted[0].profesor : (profesorFilter || 'Docente')} />}
+            fileName={`certificado_${(profesorFilter || ciclosFilter[0] || 'todos').replace(/\\s+/g, '_')}.pdf`}
+            className="btn-primary flex items-center gap-1.5 text-xs"
+          >
+            {({ loading }) => (
+              <>
+                <FileDown className="w-3.5 h-3.5" /> {loading ? 'Generando...' : 'Generar Certificado'}
+              </>
+            )}
+          </PDFDownloadLink>
           <button onClick={() => exportData('csv')} className="btn-outline flex items-center gap-1.5 text-xs">
             <FileText className="w-3.5 h-3.5" /> CSV
           </button>

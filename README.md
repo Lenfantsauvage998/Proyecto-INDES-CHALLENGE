@@ -167,3 +167,13 @@ Projecto ISSE/
 <div align="center">
   <sub>Facultad de Ingeniería · Universidad de La Sabana · 2016–2026</sub>
 </div>
+
+---
+
+Comandos
+
+npm install @react-pdf/renderer
+
+com-backend
+
+pip install fpdf2

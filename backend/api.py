@@ -18,6 +18,9 @@ import tempfile
 import threading
 import uuid
 from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import pandas as pd
 import psycopg2
@@ -184,6 +187,36 @@ def certificates(
     rows = _fetchall(conn, sql, params)
     conn.close()
     return {"results": [dict(r) for r in rows]}
+
+
+@app.get("/api/bot/certificate")
+def bot_certificate(profesor: str = Query(..., description="Professor name partial match")):
+    from pdf_generator import generate_pdf_bytes
+    from fastapi.responses import Response
+    
+    if not profesor.strip():
+        raise HTTPException(400, "Provide a profesor name.")
+        
+    # Reuse the logic from the certificates endpoint
+    try:
+        cert_data = certificates(profesor=profesor, ciclo="", ciclos="")
+        records = cert_data.get("results", [])
+    except HTTPException as e:
+        raise e
+        
+    if not records:
+        raise HTTPException(404, "No records found for the given professor.")
+        
+    # Get the actual professor name from the first record
+    real_profesor_name = records[0]["profesor"]
+    
+    pdf_bytes = generate_pdf_bytes(real_profesor_name, records)
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="certificado_{real_profesor_name.replace(" ", "_")}.pdf"'}
+    )
 
 
 @app.post("/api/upload")

@@ -35,8 +35,7 @@ export function Header() {
           </div>
         </div>
 
-        {/* Stats */}
-        {stats && (
+        {stats && typeof stats.total_records === 'number' && (
           <div className="hidden sm:flex items-center divide-x divide-white/10">
             <Stat icon={<Database className="w-3.5 h-3.5" />} value={stats.total_records.toLocaleString()} label="Registros" />
             <Stat icon={<Users className="w-3.5 h-3.5" />} value={stats.total_professors.toLocaleString()} label="Profesores" />

@@ -198,7 +198,7 @@ export function QuerySection({ refreshKey }: Props) {
             onChange={(e) => { setProfesor(e.target.value); setMissingCiclos([]) }}
             onKeyDown={handleKeyDown}
             onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-            placeholder="Nombre del profesor (parcial)..."
+            placeholder="Nombre del profesor..."
             className="input w-full pl-9 pr-9"
           />
           {profesor && (
