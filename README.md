@@ -1,286 +1,169 @@
-# ISSE — Sistema de Certificación Docente
+<div align="center">
 
-**Instituto de Enseñanza Superior** — Teacher Work Certificate Management System (2016–2026)
+# 📋 Sistema de Certificación Docente
 
-A modern full-stack application for managing, querying, and exporting teaching work certificates for professors across multiple academic periods (semesters).
+**Facultad de Ingeniería · Universidad de La Sabana**
 
-## Overview
+Consulta, exporta y certifica la carga docente de los profesores — desde cualquier dispositivo, sin instalaciones.
 
-ISSE helps faculty administrators:
-- Upload and manage teaching data across 20+ academic periods
-- Query professor work certificates by name and semester
-- Export certified hours in Excel and CSV formats
-- Track and validate teaching load per professor per semester
+[![Live](https://img.shields.io/badge/🌐_Live-proyecto--indes--challenge.onrender.com-4F46E5?style=for-the-badge)](https://proyecto-indes-challenge.onrender.com)
 
-## Tech Stack
+![React](https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat-square&logo=typescript&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat-square&logo=postgresql&logoColor=white)
+![Render](https://img.shields.io/badge/Render-46E3B7?style=flat-square&logo=render&logoColor=black)
 
-### Frontend
-- **React 19** — UI library with hooks
-- **TypeScript 6** — Type-safe component development
-- **Vite 8** — Lightning-fast build tooling
-- **Tailwind CSS 3** — Utility-first styling
-- **Lucide React** — SVG icon library
-- **Radix UI** — Headless component primitives (tabs, labels, select, slot)
-- **Framer Motion** — Animation library
-- **Class Variance Authority** — Type-safe CSS class composition
+</div>
 
-### Backend
-- **FastAPI 0.110+** — Modern async Python web framework
-- **Uvicorn 0.29+** — ASGI server
-- **SQLite 3** — Embedded relational database
-- **Pandas 2.0+** — Data transformation & aggregation
-- **OpenPyXL 3.1+** — Excel file generation & parsing
-- **Tabulate 0.9+** — CLI table formatting
+---
 
-## Features
+## ¿Qué es esto?
 
-### Data Upload
-- **Multi-period support** — Load Excel files with teaching data
-- **Duplicate prevention** — Automatic conflict detection
-- **Incremental loading** — Append new semesters without overwriting
-- **Period management** — View loaded semesters, delete individual periods or entire database
+Una plataforma web que permite consultar el historial completo de carga docente de los profesores de la Facultad de Ingeniería (2016–2026), exportar certificados en Excel o CSV, y visualizar paso a paso cómo se calculan las horas.
 
-### Query Interface
-- **Multi-semester filtering** — Select 1+ academic periods
-- **Professor search** — Autocomplete with partial name matching (280ms debounce)
-- **Keyboard navigation** — Arrow keys, Enter, Escape in search
-- **Live results** — Table displays teaching load by course and semester
+> **Nota:** La primera carga puede tardar ~30 segundos si el servidor estuvo inactivo.
 
-### Export
-- **Excel format** — Formatted with professor header, semester grouping, bold headers
-- **CSV format** — Tab-separated, portable
-- **Dynamic filtering** — Export based on current query parameters
+---
 
-## Project Structure
+## ✨ Funcionalidades
+
+| Función | Descripción |
+|---------|-------------|
+| 🔍 **Búsqueda inteligente** | Busca profesores por nombre parcial, sin importar mayúsculas ni acentos |
+| 📊 **Vista de certificados** | Tabla completa con materias, horas y departamentos por período |
+| 📅 **Filtro por ciclo** | Selecciona uno, varios o todos los períodos académicos disponibles |
+| 📁 **Exportación** | Descarga el certificado en `.xlsx` o `.csv` con un clic |
+| 🔎 **Modo auditoría** | Visualiza los 8 pasos del cálculo de horas (pestaña ¿Cómo?) |
+| 📤 **Carga de datos** | Sube un archivo Excel del consolidado pregrado para actualizar la base de datos |
+
+---
+
+## 🚀 Cómo usar la plataforma
+
+### 1 · Consultar certificados
+
+```
+1. Abre la pestaña  →  Consultar
+2. Selecciona los períodos académicos en el desplegable de la izquierda
+3. Escribe el nombre del profesor  (parcial está bien — "Mojica", "García"...)
+4. Haz clic en  Buscar
+5. Revisa la tabla  ·  haz clic en  Exportar  para descargar
+```
+
+**💡 Tip:** Usa "Seleccionar todo" para buscar en todos los períodos a la vez.
+
+---
+
+### 2 · Cargar datos nuevos
+
+```
+1. Abre la pestaña  →  Cargar Datos
+2. Arrastra o selecciona el archivo Excel del consolidado pregrado
+3. El sistema procesa en segundo plano y notifica cuando termina
+4. Si el período ya existe, te avisa antes de sobrescribir
+```
+
+---
+
+### 3 · Auditar un cálculo
+
+La pestaña **¿Cómo?** muestra los 8 pasos del pipeline de transformación:
+
+| Paso | Descripción |
+|------|-------------|
+| 1 | Datos crudos del Excel |
+| 2 | Eliminación de duplicados exactos |
+| 3 | Aislamiento por semestre |
+| 4 | Asignación de `grupo_id` |
+| 5 | Dedup de secciones combinadas |
+| 6 | Parseo de horas + duración |
+| 7 | Agregación × 16 semanas |
+| 8 | Fusión de cursos duplicados |
+
+---
+
+## 🏗️ Arquitectura
+
+```
+Usuario (navegador)
+       │
+       ▼
+  Render.com
+  ┌─────────────────────────────────────────┐
+  │  React SPA  (Vite + TypeScript)         │
+  │      Consultar · Cargar · ¿Cómo?        │
+  │                  │                      │
+  │            FastAPI (Python)             │
+  │  /api/stats · /professors · /export     │
+  └─────────────────────────────────────────┘
+               │
+               ▼
+       Neon PostgreSQL
+       ├── certificados   (6,724 registros · 555 profesores · 20 ciclos)
+       └── raw_rows       (filas pre-transformación para auditoría)
+
+  UptimeRobot  →  ping /api/stats cada 5 min  →  servidor siempre activo
+```
+
+---
+
+## 📦 Stack técnico
+
+| Capa | Tecnología |
+|------|------------|
+| Frontend | React 18 + Vite + TypeScript + Tailwind CSS |
+| Backend | Python 3.11 + FastAPI + uvicorn |
+| Base de datos | Neon PostgreSQL (free tier · 10 GB) |
+| ETL | pandas + python-calamine |
+| Deploy | Render.com (Docker, free tier) |
+| Keep-alive | UptimeRobot (ping cada 5 min) |
+
+---
+
+## 📁 Estructura del proyecto
 
 ```
 Projecto ISSE/
-├── frontend/                    # React + TypeScript UI
-│   ├── src/
-│   │   ├── App.tsx             # Main layout, tab routing
-│   │   ├── components/
-│   │   │   ├── QuerySection.tsx    # Search & results view
-│   │   │   ├── CertificateTable.tsx # Results table with export
-│   │   │   ├── UploadSection.tsx    # File upload & DB management
-│   │   │   ├── Toast.tsx           # Toast notifications
-│   │   │   └── Header.tsx          # Page header
-│   │   ├── lib/utils.ts        # CSS utilities (cn)
-│   │   └── main.tsx            # Entry point
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── tsconfig.json
-│   └── tailwind.config.js
-│
 ├── backend/
-│   ├── api.py                  # FastAPI endpoints & server
-│   └── [proxy → http://localhost:8001]
-│
-├── etl.py                      # Excel → SQLite pipeline
-├── query_certificate.py        # CLI query tool
-├── requirements.txt            # Python dependencies
-└── output/
-    └── teaching.db            # SQLite database
+│   └── api.py              # FastAPI — todos los endpoints REST
+├── frontend/
+│   └── src/
+│       ├── components/     # Componentes React
+│       ├── pages/          # Consultar, Cargar, Cómo
+│       └── lib/            # Utilidades y tipos
+├── etl.py                  # Pipeline Excel → PostgreSQL
+├── requirements.txt        # Dependencias Python
+├── Dockerfile              # Build multi-stage (Node 20 + Python 3.11)
+└── render.yaml             # Config de despliegue en Render
 ```
 
-## Installation
+---
 
-### Prerequisites
-- Node.js 18+ (for frontend)
-- Python 3.9+ (for backend)
+## 🔑 Variables de entorno
 
-### Backend Setup
+| Variable | Descripción |
+|----------|-------------|
+| `DATABASE_URL` | Connection string de Neon PostgreSQL |
+| `PORT` | Puerto de la aplicación (default: `8001`) |
 
-```bash
-# Install Python dependencies
-pip install -r requirements.txt
+---
 
-# Run ETL to initialize database (optional)
-python etl.py
-```
+## 🗄️ Endpoints API
 
-### Frontend Setup
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/api/stats` | Totales: registros, profesores, ciclos |
+| `GET` | `/api/ciclos` | Lista de períodos académicos disponibles |
+| `GET` | `/api/professors?q=nombre` | Búsqueda de profesores |
+| `GET` | `/api/certificates?profesor=...&ciclos=...` | Carga docente de un profesor |
+| `GET` | `/api/export?profesor=...&format=excel` | Exporta certificado en Excel o CSV |
+| `POST` | `/api/upload` | Sube y procesa un archivo Excel (ETL) |
+| `DELETE` | `/api/ciclo/{id}` | Elimina todos los registros de un período |
+| `DELETE` | `/api/db` | Vacía la base de datos completa |
 
-```bash
-cd frontend
-npm install
-npm run dev    # Start dev server on http://localhost:5173
-```
+---
 
-## Running the Application
-
-### 1. Start the Backend
-```bash
-# From project root
-uvicorn backend.api:app --reload --port 8001
-```
-Backend listens on `http://localhost:8001`
-
-### 2. Start the Frontend (in a new terminal)
-```bash
-cd frontend
-npm run dev
-```
-Frontend runs on `http://localhost:5173` with proxy to backend
-
-### 3. Open in Browser
-```
-http://localhost:5173
-```
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/ciclos` | List all loaded academic periods |
-| GET | `/api/professors` | Autocomplete professor names (query: `q`, `ciclos`) |
-| GET | `/api/certificates` | Query certificates (query: `profesor`, `ciclos`) |
-| GET | `/api/stats` | Database summary stats |
-| POST | `/api/upload` | Upload Excel file, run ETL |
-| DELETE | `/api/db` | Wipe entire database |
-| DELETE | `/api/ciclos/{ciclo_lectivo}` | Delete single period |
-| GET | `/api/export` | Export results (query: `formato`, `profesor`, `ciclos`) |
-
-## ETL Pipeline (etl.py)
-
-Transforms Excel source (`PREGRADO_CONSOLIDADO_*.xlsx`) → SQLite database.
-
-**Business Rules:**
-1. Drop exact duplicate rows
-2. Split dataset by `Ciclo Lectivo` (academic period)
-3. `grupo_id` = "ID Sección Combinada" when non-empty, else "Nº Clase"
-4. Parse time formats ("HH:MM:AM/PM") to decimal military hours
-5. Calculate duration per class session (end – start, clamped ≥ 0)
-6. Aggregate by (ciclo, profesor, grupo_id) → weekly hours
-7. Multiply by 16 weeks → semester hours
-8. Merge rows with identical (materia, nombre_curso, profesor)
-
-**Output Schema:**
-```sql
-CREATE TABLE certificados (
-  ciclo_lectivo TEXT,
-  profesor TEXT,
-  id_profesor TEXT,
-  num_doc_docente TEXT,
-  componente TEXT,
-  materia TEXT,
-  nombre_curso TEXT,
-  horas_semestre REAL,
-  departamento TEXT,
-  fecha_inicio TEXT,
-  fecha_fin TEXT,
-  tipo_dedicacion TEXT,
-  num_grupos INTEGER
-);
-```
-
-## Database Management
-
-### Reset Everything
-In **Cargar Datos** tab, expand "Semestres en la base de datos" and click **"Eliminar base de datos"** → confirm.
-
-### Delete One Period
-Click the **×** on any semester chip → confirm to remove only that period's records.
-
-### Upload New Data
-Drag/drop or select Excel file → click **"Procesar y Cargar"** → see new semesters added.
-
-## Development
-
-### Lint Frontend
-```bash
-cd frontend
-npm run lint
-```
-
-### Build Frontend (production)
-```bash
-cd frontend
-npm run build
-```
-
-### CLI Tool (Python)
-```bash
-# List all professors
-python query_certificate.py --list-profesores
-
-# List all periods
-python query_certificate.py --list-ciclos
-
-# Query by professor + period
-python query_certificate.py --profesor "Juan Perez" --ciclo 2024-1
-
-# Export CSV
-python query_certificate.py --profesor "Juan Perez" --export csv
-
-# Export Excel
-python query_certificate.py --ciclo 2024-1 --export excel
-```
-
-## Data Flow
-
-```
-Excel File
-    ↓
-[Upload UI] → /api/upload
-    ↓
-[Backend] Run etl.py (append mode)
-    ↓
-[SQLite] teaching.db updated
-    ↓
-[Frontend] /api/ciclos refreshes semester list
-    ↓
-[Query UI] Autocomplete & results enabled
-    ↓
-[Export] CSV/Excel via /api/export
-```
-
-## Key Features Explained
-
-### Duplicate Prevention
-- On upload: Pre-scan file for ciclos (`Ciclo Lectivo` column)
-- If any ciclo already exists in DB → 409 conflict, list conflicting periods
-- User can cancel and select different file
-
-### Autocomplete
-- Debounced 280ms while typing
-- Scoped to selected semester(s) if filtering by ciclo
-- Keyboard navigation: ↑/↓ to move, Enter to select, Esc to close
-
-### Multi-Semester Selection
-- Checkbox dropdown with "Select all" toggle
-- Selected ciclos persist in search parameters
-- Results show Semestre column only when 2+ periods selected
-
-### Excel Export Format
-- Professor header: name + document ID
-- Table: SEMESTRE | COMPONENTE | ASIGNATURA | SESIONES | DEPARTAMENTO | FECHA INICIO | FECHA FIN
-- Merged SEMESTRE cells per ciclo group
-- Bold gray headers, monospace hours
-
-## Troubleshooting
-
-### Port 8001 already in use
-```bash
-# Kill process on port 8001
-lsof -i :8001
-kill -9 <PID>
-```
-
-### Frontend won't connect to backend
-- Check backend is running: `http://localhost:8001/api/ciclos`
-- Check `vite.config.ts` proxy target
-
-### Excel import fails
-- Ensure column names match exactly (case-sensitive)
-- Required: "Ciclo Lectivo", "Hora Inicio", "Hora Final", "Nº Clase"
-- File must be `.xlsx` or `.xls` format
-
-### Database corrupted
-- Delete `output/teaching.db` and re-upload files via UI
-- Or use `/api/db` endpoint
-
-## Authors
-**Facultad de Ingeniería** — Sistema de Certificación Docente (2016–2026)
-
-## License
-[Add your license here]
+<div align="center">
+  <sub>Facultad de Ingeniería · Universidad de La Sabana · 2016–2026</sub>
+</div>
