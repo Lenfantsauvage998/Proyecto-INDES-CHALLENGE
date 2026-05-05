@@ -440,6 +440,12 @@ def _build_certificate_word(df: "pd.DataFrame", buf: "io.BytesIO") -> None:
 
     profesor = str(df["profesor"].iloc[0]) if "profesor" in df.columns and len(df) else "—"
 
+    # ── 0. Strip unwanted boilerplate paragraphs ─────────────────────────────
+    STRIP_KEYWORDS = ["Recuerda que ahora", "puedes evaluar"]
+    for para in list(doc.paragraphs):
+        if any(k in para.text for k in STRIP_KEYWORDS):
+            para._element.getparent().remove(para._element)
+
     # ── 1. Replace {{Nombre profesor}} in all paragraphs ─────────────────────
     for para in doc.paragraphs:
         if "{{Nombre profesor}}" in para.text:

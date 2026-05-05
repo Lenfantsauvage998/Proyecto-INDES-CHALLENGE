@@ -68,7 +68,7 @@ export function CertificateTable({ data, profesorFilter, ciclosFilter }: Props) 
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-blue-500/40 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20 hover:text-blue-100 transition-colors duration-150"
           >
             <FileType2 className="w-3.5 h-3.5" />
-            <Download className="w-3 h-3" /> Word
+            <Download className="w-3 h-3" /> Certificación
           </button>
         </div>
       </div>
